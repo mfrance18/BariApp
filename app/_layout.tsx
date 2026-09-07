@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { db } from '../src/db/client';
 import migrations from '../src/db/migrations/migrations';
 import { ensureSettingsSeeded } from '../src/db/repositories/settingsRepo';
+import { rescheduleAll } from '../src/services/notifications/scheduler';
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,13 @@ export default function RootLayout() {
       .then(() => setSeeded(true))
       .catch((err: Error) => setSeedError(err));
   }, [migrationsSuccess]);
+
+  useEffect(() => {
+    if (!seeded) return;
+    rescheduleAll().catch(() => {
+      // Best-effort: reminders simply won't fire until the next successful reschedule.
+    });
+  }, [seeded]);
 
   if (migrationsError || seedError) {
     return (
