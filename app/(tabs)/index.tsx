@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { listEntriesForDate as listFluidEntriesForDate } from '../../src/db/repositories/fluidRepo';
 import { deleteEntry, listEntriesForDate, type MealLogEntryWithName } from '../../src/db/repositories/mealLogRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
@@ -40,8 +41,14 @@ export default function DashboardScreen() {
 
   const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
   const { data: latestWeight } = useQuery({ queryKey: ['weightLog', 'latest'], queryFn: getLatestWeightLogEntry });
+  const { data: fluidEntries } = useQuery({
+    queryKey: ['fluidLog', logDate],
+    queryFn: () => listFluidEntriesForDate(logDate),
+  });
 
   const grouped = groupEntriesByMeal(entries ?? []);
+  const fluidTotalMl = (fluidEntries ?? []).reduce((sum, e) => sum + e.amountMl, 0);
+  const fluidGoalMl = settings?.dailyFluidGoalMl ?? 1500;
   const dailyTotals = sumEntries(entries ?? []);
 
   return (
@@ -65,6 +72,12 @@ export default function DashboardScreen() {
             <Text style={styles.totalsText}>{Math.round(dailyTotals.calories)} kcal</Text>
             <Text style={styles.totalsSubtext}>{Math.round(dailyTotals.proteinG)} g protein today</Text>
           </View>
+          <TouchableOpacity
+            style={styles.fluidStrip}
+            onPress={() => router.push('/fluids')}
+          >
+            <Text style={styles.fluidStripText}>💧 {fluidTotalMl} / {fluidGoalMl} mL</Text>
+          </TouchableOpacity>
           {latestWeight && (
             <TouchableOpacity style={styles.weightCard} onPress={() => router.push('/weight-history')}>
               <Text style={styles.weightCardText}>
@@ -196,6 +209,17 @@ const styles = StyleSheet.create({
   weightCardSubtext: {
     fontSize: 12,
     color: '#666',
+  },
+  fluidStrip: {
+    backgroundColor: '#e0f2fe',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  fluidStripText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0369a1',
   },
   mealSection: {
     borderWidth: StyleSheet.hairlineWidth,
