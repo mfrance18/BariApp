@@ -4,8 +4,12 @@ import { useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { deleteEntry, listEntriesForDate, type MealLogEntryWithName } from '../../src/db/repositories/mealLogRepo';
+import { getSettings } from '../../src/db/repositories/settingsRepo';
+import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { formatDisplayDate, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
+
+const KG_TO_LB = 2.20462;
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -34,6 +38,9 @@ export default function DashboardScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['mealLogEntries', logDate] }),
   });
 
+  const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
+  const { data: latestWeight } = useQuery({ queryKey: ['weightLog', 'latest'], queryFn: getLatestWeightLogEntry });
+
   const grouped = groupEntriesByMeal(entries ?? []);
   const dailyTotals = sumEntries(entries ?? []);
 
@@ -58,6 +65,20 @@ export default function DashboardScreen() {
             <Text style={styles.totalsText}>{Math.round(dailyTotals.calories)} kcal</Text>
             <Text style={styles.totalsSubtext}>{Math.round(dailyTotals.proteinG)} g protein today</Text>
           </View>
+          {latestWeight && (
+            <TouchableOpacity style={styles.weightCard} onPress={() => router.push('/weight-history')}>
+              <Text style={styles.weightCardText}>
+                {(settings?.weightUnit === 'kg'
+                  ? latestWeight.weightKg
+                  : latestWeight.weightKg * KG_TO_LB
+                ).toFixed(1)}{' '}
+                {settings?.weightUnit ?? 'lb'}
+              </Text>
+              <Text style={styles.weightCardSubtext}>
+                as of {new Date(latestWeight.recordedAt).toLocaleDateString()} · View history
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       }
       renderItem={({ item: meal }) => (
@@ -159,6 +180,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   totalsSubtext: {
+    color: '#666',
+  },
+  weightCard: {
+    backgroundColor: '#eff6ff',
+    borderRadius: 12,
+    padding: 12,
+    alignItems: 'center',
+  },
+  weightCardText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1d4ed8',
+  },
+  weightCardSubtext: {
+    fontSize: 12,
     color: '#666',
   },
   mealSection: {

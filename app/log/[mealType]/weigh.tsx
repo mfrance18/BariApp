@@ -6,6 +6,8 @@ import { ActivityIndicator, Button, StyleSheet, Text, TextInput, View } from 're
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
+import { getSettings } from '../../../src/db/repositories/settingsRepo';
+import { getLatestWeight } from '../../../src/services/vesync/adapter';
 import {
   computeRecipeTotals,
   getReferenceWeightG,
@@ -27,9 +29,26 @@ export default function WeighScreen() {
   }>();
   const queryClient = useQueryClient();
   const [weightG, setWeightG] = useState('');
+  const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
+  const [scaleError, setScaleError] = useState<string | null>(null);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
+
+  const settingsQuery = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
+
+  const pullFromScaleMutation = useMutation({
+    mutationFn: () => getLatestWeight(),
+    onSuccess: (reading) => {
+      if (!reading) {
+        setScaleError("Couldn't read the scale — enter weight manually.");
+        return;
+      }
+      setScaleError(null);
+      setWeightG(String(Math.round(reading.weightKg * 1000)));
+      setWeightSource('vesync_scale');
+    },
+  });
 
   const foodQuery = useQuery({
     queryKey: ['foods', id],
@@ -84,7 +103,7 @@ export default function WeighScreen() {
         foodId: itemType === 'food' ? id : null,
         recipeId: itemType === 'recipe' ? id : null,
         weightG: weight,
-        weightSource: 'manual',
+        weightSource,
         loggedAt: new Date().toISOString(),
         notes: null,
         ...nutrition,
@@ -115,11 +134,23 @@ export default function WeighScreen() {
         <TextInput
           style={styles.input}
           value={weightG}
-          onChangeText={setWeightG}
+          onChangeText={(v) => {
+            setWeightG(v);
+            setWeightSource('manual');
+          }}
           keyboardType="decimal-pad"
           placeholder="e.g. 120"
           autoFocus
         />
+        {settingsQuery.data?.vesyncConnected && (
+          <Button
+            title={pullFromScaleMutation.isPending ? 'Reading scale…' : 'Pull from Scale'}
+            onPress={() => pullFromScaleMutation.mutate()}
+            disabled={pullFromScaleMutation.isPending}
+          />
+        )}
+        {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
+        {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
       </View>
 
       <View style={styles.previewBox}>
@@ -206,6 +237,10 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#c00',
+    fontSize: 13,
+  },
+  helperText: {
+    color: '#2563eb',
     fontSize: 13,
   },
 });
