@@ -45,3 +45,36 @@ code with Expo Go.
 
 All app data lives on-device; there is no backend or account system beyond
 your own VeSync login (used only to read your scale).
+
+## Building a real app (EAS)
+
+The app currently uses Expo's default icon/splash placeholders — swap
+`assets/icon.png`, `assets/splash-icon.png`, and the Android adaptive icon
+assets for your own before shipping a build.
+
+To build an installable app instead of running through Expo Go:
+
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure   # links this project to your Expo account, adds an eas projectId to app.json
+eas build --profile development --platform android   # or ios
+```
+
+`eas.json` already defines `development`, `preview`, and `production`
+build profiles.
+
+## VeSync scale integration — verify before relying on it
+
+`src/services/vesync/client.ts` reimplements VeSync's unofficial cloud
+protocol (the same one `pyvesync`/Home Assistant use). The login and
+device-list calls are the stable, well-documented part of that protocol,
+but the scale-reading command (`getWeighingDataV2`) and its value scaling
+were **not verified against a real account/scale** — VeSync's smart scale
+is a less commonly reverse-engineered device category than their
+plugs/bulbs/humidifiers. `DEBUG_LOG_RAW_RESPONSES` in that file is on by
+default so you can see the raw JSON in the Metro console the first time
+you connect your real VeSync account, and adjust the field names/scaling
+in `client.ts` if they don't match. The rest of the app is unaffected
+either way — the "weigh it" flow always falls back to manual entry if the
+scale can't be read.

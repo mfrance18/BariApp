@@ -71,6 +71,24 @@ export default function DashboardScreen() {
           <View style={styles.totalsBox}>
             <Text style={styles.totalsText}>{Math.round(dailyTotals.calories)} kcal</Text>
             <Text style={styles.totalsSubtext}>{Math.round(dailyTotals.proteinG)} g protein today</Text>
+            {settings && (
+              <View style={styles.goalsBox}>
+                <GoalProgress
+                  label="Calories"
+                  value={dailyTotals.calories}
+                  goal={settings.dailyCalorieGoal}
+                  unit="kcal"
+                  color="#f59e0b"
+                />
+                <GoalProgress
+                  label="Protein"
+                  value={dailyTotals.proteinG}
+                  goal={settings.dailyProteinGoalG}
+                  unit="g"
+                  color="#16a34a"
+                />
+              </View>
+            )}
           </View>
           <TouchableOpacity
             style={styles.fluidStrip}
@@ -106,6 +124,32 @@ export default function DashboardScreen() {
   );
 }
 
+function GoalProgress({
+  label,
+  value,
+  goal,
+  unit,
+  color,
+}: {
+  label: string;
+  value: number;
+  goal: number;
+  unit: string;
+  color: string;
+}) {
+  const progress = goal > 0 ? Math.min(1, value / goal) : 0;
+  return (
+    <View style={styles.goalRow}>
+      <Text style={styles.goalLabel}>
+        {label} ({Math.round(value)} / {Math.round(goal)} {unit})
+      </Text>
+      <View style={styles.goalTrack}>
+        <View style={[styles.goalFill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
 function MealSection({
   meal,
   entries,
@@ -131,12 +175,26 @@ function MealSection({
       ) : (
         entries.map((entry) => (
           <View key={entry.id} style={styles.entryRow}>
-            <View style={styles.entryTextGroup}>
+            <TouchableOpacity
+              style={styles.entryTextGroup}
+              onPress={() =>
+                router.push({
+                  pathname: '/log/[mealType]/weigh',
+                  params: {
+                    mealType: entry.mealType,
+                    itemType: entry.itemType,
+                    itemId: String(entry.itemType === 'food' ? entry.foodId : entry.recipeId),
+                    logDate: entry.logDate,
+                    entryId: String(entry.id),
+                  },
+                })
+              }
+            >
               <Text style={styles.entryName}>{entry.itemName}</Text>
               <Text style={styles.entrySubtext}>
                 {entry.weightG} g · {Math.round(entry.calories)} kcal
               </Text>
-            </View>
+            </TouchableOpacity>
             <Text style={styles.removeLink} onPress={() => onDelete(entry.id)}>
               Remove
             </Text>
@@ -194,6 +252,27 @@ const styles = StyleSheet.create({
   },
   totalsSubtext: {
     color: '#666',
+  },
+  goalsBox: {
+    width: '100%',
+    gap: 8,
+    marginTop: 10,
+  },
+  goalRow: {
+    gap: 4,
+  },
+  goalLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  goalTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#e5e7eb',
+    overflow: 'hidden',
+  },
+  goalFill: {
+    height: '100%',
   },
   weightCard: {
     backgroundColor: '#eff6ff',

@@ -36,6 +36,11 @@ export async function listEntriesForDate(logDate: string): Promise<MealLogEntryW
   }));
 }
 
+export async function getEntryById(id: number): Promise<MealLogEntry | null> {
+  const rows = await db.select().from(mealLogEntries).where(eq(mealLogEntries.id, id));
+  return rows[0] ?? null;
+}
+
 export async function createEntry(
   input: Omit<NewMealLogEntry, 'id' | 'createdAt' | 'updatedAt'>,
 ): Promise<MealLogEntry> {
@@ -45,6 +50,16 @@ export async function createEntry(
     .values({ ...input, createdAt: now, updatedAt: now })
     .returning();
   return rows[0];
+}
+
+export async function updateEntry(
+  id: number,
+  patch: Partial<Omit<NewMealLogEntry, 'id' | 'createdAt'>>,
+): Promise<void> {
+  await db
+    .update(mealLogEntries)
+    .set({ ...patch, updatedAt: new Date().toISOString() })
+    .where(eq(mealLogEntries.id, id));
 }
 
 export async function deleteEntry(id: number): Promise<void> {

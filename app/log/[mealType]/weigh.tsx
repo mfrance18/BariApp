@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Button, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
-import { createEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
+import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
 import { getSettings } from '../../../src/db/repositories/settingsRepo';
 import { getLatestWeight } from '../../../src/services/vesync/adapter';
@@ -21,11 +21,12 @@ import type { MealType } from '../../../src/services/nutrition/totals';
 import { todayLogDateKey } from '../../../src/utils/date';
 
 export default function WeighScreen() {
-  const { mealType, itemType, itemId, logDate } = useLocalSearchParams<{
+  const { mealType, itemType, itemId, logDate, entryId } = useLocalSearchParams<{
     mealType: MealType;
     itemType: 'food' | 'recipe';
     itemId: string;
     logDate?: string;
+    entryId?: string;
   }>();
   const queryClient = useQueryClient();
   const [weightG, setWeightG] = useState('');
@@ -34,6 +35,20 @@ export default function WeighScreen() {
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
+  const isEditing = entryId != null;
+
+  const existingEntryQuery = useQuery({
+    queryKey: ['mealLogEntry', entryId],
+    queryFn: () => getEntryById(Number(entryId)),
+    enabled: isEditing,
+  });
+
+  useEffect(() => {
+    if (existingEntryQuery.data) {
+      setWeightG(String(existingEntryQuery.data.weightG));
+      setWeightSource(existingEntryQuery.data.weightSource);
+    }
+  }, [existingEntryQuery.data]);
 
   const settingsQuery = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
 
@@ -63,7 +78,11 @@ export default function WeighScreen() {
   });
 
   const itemName = itemType === 'food' ? foodQuery.data?.name : recipeQuery.data?.name;
-  const isLoading = itemType === 'food' ? foodQuery.isLoading : recipeQuery.isLoading;
+  const isLoading =
+    (itemType === 'food' ? foodQuery.isLoading : recipeQuery.isLoading) ||
+    (isEditing && existingEntryQuery.isLoading);
+  const itemNotFound =
+    !isLoading && (itemType === 'food' ? foodQuery.data === null : recipeQuery.data === null);
 
   const preview: NutritionFields | null = useMemo(() => {
     const weight = Number(weightG);
@@ -96,6 +115,10 @@ export default function WeighScreen() {
       const nutrition = preview;
       if (!nutrition) throw new Error('Unable to compute nutrition for this weight');
 
+      if (isEditing) {
+        return updateEntry(Number(entryId), { weightG: weight, weightSource, ...nutrition });
+      }
+
       const entry: Omit<NewMealLogEntry, 'id' | 'createdAt' | 'updatedAt'> = {
         logDate: effectiveLogDate,
         mealType,
@@ -120,6 +143,14 @@ export default function WeighScreen() {
     return (
       <View style={styles.center}>
         <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (itemNotFound) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.errorText}>This food or recipe no longer exists.</Text>
       </View>
     );
   }
@@ -166,7 +197,7 @@ export default function WeighScreen() {
       {mutation.error && <Text style={styles.errorText}>{(mutation.error as Error).message}</Text>}
 
       <Button
-        title={mutation.isPending ? 'Logging…' : 'Log It'}
+        title={mutation.isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Log It'}
         onPress={() => mutation.mutate()}
         disabled={mutation.isPending || !preview}
       />
