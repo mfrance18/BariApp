@@ -40,6 +40,8 @@ const PHONE_OS = 'iOS';
 const ACCEPT_LANGUAGE = 'en';
 const REGION = 'US';
 const TIME_ZONE = 'America/New_York';
+/** Some older, non-dataclass-based endpoints (the scale reads) also expect the session repeated in headers. */
+const MOBILE_ID = String(Math.floor(1_000_000_000_000_000 + Math.random() * 9_000_000_000_000_000));
 
 let traceCounter = 0;
 /** Mirrors pyvesync's DefaultValues.newTraceId() shape: not strictly validated, but matched for fidelity. */
@@ -74,14 +76,29 @@ interface VeSyncApiResponse<T> {
   result?: T;
 }
 
-async function postJson<T>(path: string, body: Record<string, unknown>): Promise<VeSyncApiResponse<T>> {
+async function postJson<T>(
+  path: string,
+  body: Record<string, unknown>,
+  extraHeaders?: Record<string, string>,
+): Promise<VeSyncApiResponse<T>> {
   const response = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...extraHeaders },
     body: JSON.stringify(body),
   });
   const data = (await response.json()) as VeSyncApiResponse<T>;
   return data;
+}
+
+/** Older, non-dataclass-based endpoints (scale reads) expect the session repeated as headers, not just body fields. */
+function legacyHeaders(session: VeSyncSession): Record<string, string> {
+  return {
+    'accept-language': ACCEPT_LANGUAGE,
+    accountId: session.accountId,
+    appVersion: APP_VERSION,
+    tk: session.token,
+    tz: TIME_ZONE,
+  };
 }
 
 export class VeSyncAuthError extends Error {}
@@ -243,9 +260,13 @@ function toWeightReading(raw: RawScaleReading, fallbackId: string): WeightReadin
  * two independent, unverified community reports about VeSync's fitness
  * scale line, tried in order:
  *  1. `/cloud/v2/deviceManaged/getWeighingDataV2` — a flat-body request
- *     (page/pageSize/allData/debugMode/configModule) documented in an open
- *     (unmerged) pyvesync PR adding ESF24 scale support, returning
- *     `result.weightDatas: [{ subUserID, timestamp, weightG }]`.
+ *     (page/pageSize/allData/debugMode/configModule/mobileId) documented
+ *     in an open (unmerged) pyvesync PR adding ESF24 scale support,
+ *     returning `result.weightDatas: [{ subUserID, timestamp, weightG }]`.
+ *     That PR's `req_body`/`req_headers` helpers (an older, pre-dataclass
+ *     pyvesync generation) also repeat token/accountID/appVersion as HTTP
+ *     headers (`tk`/`accountId`/`appVersion`), not just body fields — see
+ *     `legacyHeaders()` — which this and the fallback below both send.
  *  2. `/cloud/v1/deviceManaged/fatScale/getWeighData` — referenced in a
  *     pyvesync GitHub issue by someone who packet-captured the real app
  *     talking to it for an ESF00+ scale, but no body/response shape was
@@ -267,11 +288,13 @@ async function fetchWeighingData(session: VeSyncSession, device: VeSyncDevice): 
       phoneOS: PHONE_OS,
       acceptLanguage: ACCEPT_LANGUAGE,
       traceId: newTraceId(session.terminalId),
+      mobileId: MOBILE_ID,
       pageSize: 100,
       page: 1,
       debugMode: false,
       allData: true,
     },
+    legacyHeaders(session),
   );
 
   logDebug('getWeighingDataV2 response', v2Response);
@@ -297,7 +320,9 @@ async function fetchWeighingData(session: VeSyncSession, device: VeSyncDevice): 
       phoneOS: PHONE_OS,
       acceptLanguage: ACCEPT_LANGUAGE,
       traceId: newTraceId(session.terminalId),
+      mobileId: MOBILE_ID,
     },
+    legacyHeaders(session),
   );
 
   logDebug('fatScale/getWeighData response', fatScaleResponse);
