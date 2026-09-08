@@ -122,7 +122,7 @@ export default function PickItemScreen() {
     }, [tab]),
   );
 
-  function goToWeigh(itemType: PickTab, itemId: number) {
+  function goToWeigh(itemType: PickTab, itemId: number, entryMode?: 'weight') {
     router.push({
       pathname: '/log/[mealType]/weigh',
       params: {
@@ -130,6 +130,7 @@ export default function PickItemScreen() {
         itemType: itemType === 'foods' ? 'food' : 'recipe',
         itemId: String(itemId),
         logDate: effectiveLogDate,
+        ...(entryMode ? { entryMode } : {}),
       },
     });
   }
@@ -196,15 +197,17 @@ export default function PickItemScreen() {
               quickAddMutation.variables?.id === item.id;
             return (
               <View style={styles.row}>
-                <View style={styles.rowIcon}>
-                  <Ionicons name="fast-food-outline" size={18} color={colors.primary} />
-                </View>
-                <View style={styles.rowTextGroup}>
-                  <Text style={styles.rowTitle}>{item.name}</Text>
-                  <Text style={styles.rowSubtitle}>
-                    {item.calories} kcal / {item.servingAmount} {item.servingUnit}
-                  </Text>
-                </View>
+                <TouchableOpacity style={styles.rowMain} onPress={() => goToWeigh('foods', item.id)}>
+                  <View style={styles.rowIcon}>
+                    <Ionicons name="fast-food-outline" size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.rowTextGroup}>
+                    <Text style={styles.rowTitle}>{item.name}</Text>
+                    <Text style={styles.rowSubtitle}>
+                      {item.calories} kcal / {item.servingAmount} {item.servingUnit}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
                 <View style={styles.rowActions}>
                   <TouchableOpacity
                     style={styles.rowActionButton}
@@ -215,7 +218,7 @@ export default function PickItemScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.rowActionButtonSecondary}
-                    onPress={() => goToWeigh('foods', item.id)}
+                    onPress={() => goToWeigh('foods', item.id, 'weight')}
                   >
                     <Text style={styles.rowActionButtonSecondaryText}>Weigh</Text>
                   </TouchableOpacity>
@@ -259,15 +262,17 @@ export default function PickItemScreen() {
               quickAddMutation.variables?.id === item.id;
             return (
               <View style={styles.row}>
-                <View style={styles.rowIcon}>
-                  <Ionicons name="restaurant-outline" size={18} color={colors.primary} />
-                </View>
-                <View style={styles.rowTextGroup}>
-                  <Text style={styles.rowTitle}>{item.name}</Text>
-                  <Text style={styles.rowSubtitle}>
-                    {item.cachedCaloriesPerServing} kcal/serving · {item.servings} servings
-                  </Text>
-                </View>
+                <TouchableOpacity style={styles.rowMain} onPress={() => goToWeigh('recipes', item.id)}>
+                  <View style={styles.rowIcon}>
+                    <Ionicons name="restaurant-outline" size={18} color={colors.primary} />
+                  </View>
+                  <View style={styles.rowTextGroup}>
+                    <Text style={styles.rowTitle}>{item.name}</Text>
+                    <Text style={styles.rowSubtitle}>
+                      {item.cachedCaloriesPerServing} kcal/serving · {item.servings} servings
+                    </Text>
+                  </View>
+                </TouchableOpacity>
                 <View style={styles.rowActions}>
                   <TouchableOpacity
                     style={styles.rowActionButton}
@@ -334,6 +339,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
     marginBottom: spacing.sm,
+  },
+  rowMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   rowIcon: {
     width: 32,

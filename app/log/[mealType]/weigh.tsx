@@ -44,12 +44,13 @@ const NUTRIENT_COLORS: Record<string, string> = {
 };
 
 export default function WeighScreen() {
-  const { mealType, itemType, itemId, logDate, entryId } = useLocalSearchParams<{
+  const { mealType, itemType, itemId, logDate, entryId, entryMode } = useLocalSearchParams<{
     mealType: MealType;
     itemType: 'food' | 'recipe';
     itemId: string;
     logDate?: string;
     entryId?: string;
+    entryMode?: 'weight' | 'servings';
   }>();
   const queryClient = useQueryClient();
   const [weightInput, setWeightInput] = useState('');
@@ -97,13 +98,18 @@ export default function WeighScreen() {
     enabled: itemType === 'recipe',
   });
 
-  // A food with a captured weight equivalent (e.g. "1 bottle" = 355g) can be
-  // weighed directly even though its own serving unit is a discrete count.
+  // Foods with a discrete serving unit (e.g. "portion", "bottle") default to
+  // a simple servings entry, even when a weight equivalent has been captured
+  // for recipe/scale use — explicitly choosing "Weigh" (entryMode=weight)
+  // switches to precise weight entry instead, and editing an entry that was
+  // originally logged by weight keeps showing weight.
+  const wasWeighedEntry = isEditing && existingEntryQuery.data?.weightG != null;
   const isCountBased =
     itemType === 'food' &&
     !!foodQuery.data &&
     !isWeighableUnit(foodQuery.data.servingUnit) &&
-    foodQuery.data.servingWeightG == null;
+    entryMode !== 'weight' &&
+    !wasWeighedEntry;
 
   useEffect(() => {
     if (!existingEntryQuery.data) return;
