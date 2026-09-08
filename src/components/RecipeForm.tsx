@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { listFoods, type Food } from '../db/repositories/foodsRepo';
 import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
@@ -9,7 +11,6 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
-import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from './ui/KeyboardAvoidingScreen';
 
 export interface RecipeIngredientDraft {
   food: Food;
@@ -76,7 +77,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [ingredients, setIngredients] = useState<RecipeIngredientDraft[]>(initialValues.ingredients);
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const bottomPadding = useKeyboardBottomPadding(24);
+  const insets = useSafeAreaInsets();
 
   const { data: searchResults } = useQuery({
     queryKey: ['foods', 'search', searchText],
@@ -136,11 +137,13 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   }
 
   return (
-    <KeyboardAvoidingScreen>
-    <FlatList
+    <KeyboardAwareFlatList
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
+      contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
+      enableOnAndroid
+      extraScrollHeight={24}
+      keyboardOpeningTime={0}
       data={ingredients}
       keyExtractor={(item, index) => `${item.food.id}-${index}`}
       ListHeaderComponent={
@@ -221,7 +224,6 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         </View>
       }
     />
-    </KeyboardAvoidingScreen>
   );
 }
 

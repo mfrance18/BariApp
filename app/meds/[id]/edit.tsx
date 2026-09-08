@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
-import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import {
   archiveVitaminMed,
@@ -52,7 +52,6 @@ export default function EditVitaminMedScreen() {
   const [schedules, setSchedules] = useState<ScheduleDraft[]>(isNew ? [newScheduleDraft()] : []);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(isNew);
-  const bottomPadding = useKeyboardBottomPadding(48);
 
   const medQuery = useQuery({
     queryKey: ['vitaminsMeds', vitaminMedId],
@@ -172,11 +171,13 @@ export default function EditVitaminMedScreen() {
   }
 
   return (
-    <KeyboardAvoidingScreen>
-    <ScrollView
+    <KeyboardAwareScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
+      contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
+      enableOnAndroid
+      extraScrollHeight={24}
+      keyboardOpeningTime={0}
     >
       <Card style={styles.card}>
         <Field label="Name" value={name} onChangeText={setName} />
@@ -252,8 +253,7 @@ export default function EditVitaminMedScreen() {
           <AppButton title="Archive" variant="danger" onPress={() => archiveMutation.mutate()} />
         </View>
       )}
-    </ScrollView>
-    </KeyboardAvoidingScreen>
+    </KeyboardAwareScrollView>
   );
 }
 

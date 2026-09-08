@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { roundNutritionForDisplay } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
-import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from './ui/KeyboardAvoidingScreen';
 
 export interface FoodFormValues {
   name: string;
@@ -110,7 +111,7 @@ export function FoodForm({
 }: FoodFormProps) {
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState<string | null>(null);
-  const bottomPadding = useKeyboardBottomPadding(24);
+  const insets = useSafeAreaInsets();
 
   function set<K extends keyof FoodFormValues>(key: K, value: FoodFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -158,11 +159,13 @@ export function FoodForm({
     values.servingAmount && values.servingUnit ? `${values.servingAmount} ${values.servingUnit}` : 'serving';
 
   return (
-    <KeyboardAvoidingScreen>
-    <ScrollView
+    <KeyboardAwareScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
+      contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
+      enableOnAndroid
+      extraScrollHeight={24}
+      keyboardOpeningTime={0}
     >
       {onScanBarcode && <AppButton title="Scan Barcode" variant="secondary" onPress={onScanBarcode} />}
 
@@ -245,8 +248,7 @@ export function FoodForm({
           />
         )}
       </View>
-    </ScrollView>
-    </KeyboardAvoidingScreen>
+    </KeyboardAwareScrollView>
   );
 }
 

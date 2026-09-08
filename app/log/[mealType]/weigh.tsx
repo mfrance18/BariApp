@@ -1,11 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
-import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
@@ -48,7 +48,6 @@ export default function WeighScreen() {
   const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
   const [scaleError, setScaleError] = useState<string | null>(null);
-  const bottomPadding = useKeyboardBottomPadding(spacing.xl * 2);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
@@ -186,12 +185,14 @@ export default function WeighScreen() {
   }
 
   return (
-    <KeyboardAvoidingScreen>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
-        keyboardShouldPersistTaps="handled"
-      >
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      enableOnAndroid
+      extraScrollHeight={24}
+      keyboardOpeningTime={0}
+    >
       <Text style={styles.itemName}>{itemName}</Text>
       <Text style={styles.mealLabel}>Logging to {mealType}</Text>
 
@@ -256,8 +257,7 @@ export default function WeighScreen() {
         onPress={() => mutation.mutate()}
         disabled={mutation.isPending || !preview}
       />
-      </ScrollView>
-    </KeyboardAvoidingScreen>
+    </KeyboardAwareScrollView>
   );
 }
 
