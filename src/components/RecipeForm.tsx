@@ -5,12 +5,16 @@ import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-nativ
 import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { listFoods, type Food } from '../db/repositories/foodsRepo';
+import { createFood, getFoodByBarcode, listFoods, restoreFood, type Food } from '../db/repositories/foodsRepo';
+import { mapOffProductToFood } from '../services/openFoodFacts/mapper';
+import type { OffProduct } from '../services/openFoodFacts/types';
+import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
 import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
+import { OffFoodResults } from './OffFoodResults';
 
 export interface RecipeIngredientDraft {
   food: Food;
@@ -85,6 +89,9 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     enabled: searchText.trim().length > 0,
   });
 
+  const showOffSearch = searchText.trim().length > 1;
+  const offSearch = useOffFoodSearch(searchText, showOffSearch);
+
   const preview = useMemo(() => {
     const servingsNum = Number(servings) || 1;
     const validIngredients = ingredients
@@ -116,6 +123,23 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     setError(null);
     setIngredients((prev) => [...prev, { food, quantityG: '100' }]);
     setSearchText('');
+  }
+
+  async function handleSelectOffProduct(product: OffProduct) {
+    try {
+      const existing = await getFoodByBarcode(product.code);
+      if (existing) {
+        if (existing.archivedAt) {
+          await restoreFood(existing.id);
+        }
+        addIngredient({ ...existing, archivedAt: null });
+        return;
+      }
+      const created = await createFood(mapOffProductToFood(product, product.code));
+      addIngredient(created);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   }
 
   function removeIngredient(index: number) {
@@ -174,6 +198,20 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
                 </TouchableOpacity>
               ))}
             </Card>
+          )}
+          {showOffSearch && (
+            <View style={styles.offSection}>
+              <OffFoodResults
+                results={offSearch.results}
+                loading={offSearch.loading}
+                error={offSearch.error}
+                onRetry={offSearch.retry}
+                hasMore={offSearch.hasMore}
+                loadingMore={offSearch.loadingMore}
+                onLoadMore={offSearch.loadMore}
+                onSelect={handleSelectOffProduct}
+              />
+            </View>
           )}
         </View>
       }
@@ -315,6 +353,9 @@ const styles = StyleSheet.create({
   searchResults: {
     padding: 0,
     overflow: 'hidden',
+  },
+  offSection: {
+    marginTop: spacing.sm,
   },
   searchResultRow: {
     flexDirection: 'row',

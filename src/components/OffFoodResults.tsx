@@ -13,7 +13,10 @@ interface OffFoodResultsProps {
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
-  context: FoodMatchContext;
+  /** Default behavior: navigate to the existing/new food screen. Required unless onSelect is given. */
+  context?: FoodMatchContext;
+  /** Overrides the default navigation with a custom handler (e.g. create-and-use-inline instead of navigating away). */
+  onSelect?: (product: OffProduct) => void;
 }
 
 /** Lets the user search Open Food Facts and pick a match, alongside whatever's already in the local library. */
@@ -26,8 +29,14 @@ export function OffFoodResults({
   loadingMore,
   onLoadMore,
   context,
+  onSelect,
 }: OffFoodResultsProps) {
   async function handlePress(product: OffProduct) {
+    if (onSelect) {
+      onSelect(product);
+      return;
+    }
+    if (!context) return;
     const handledExisting = await navigateToExistingFoodByBarcode(product.code, context);
     if (!handledExisting) {
       navigateToPrefilledFoodForm(product, product.code, context);
