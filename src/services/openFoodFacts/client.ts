@@ -70,8 +70,16 @@ export async function searchProductsByName(query: string, limit = 24): Promise<O
     search_simple: '1',
     action: 'process',
     json: '1',
+    // For a broad/common query (a well-known brand name, a generic category
+    // like "orange juice") OFF can have thousands of matches; without a
+    // relevance hint its own ordering is unpredictable and a specific
+    // well-known product can miss a small page entirely before our own
+    // filtering below even runs. Bias toward well-known (heavily-scanned)
+    // products and fetch a much larger pool so this app's own filter has
+    // enough to work with.
+    sort_by: 'unique_scans_n',
     fields: FIELDS,
-    page_size: '40',
+    page_size: '100',
   });
   const response = await fetch(`${DOMAIN}/cgi/search.pl?${params.toString()}`, { headers: OFF_HEADERS });
   if (!response.ok) {
