@@ -11,9 +11,14 @@ import type { VeSyncCredentials, VeSyncDevice, VeSyncSession, WeightReading } fr
  * mechanism used to query/control most VeSync device categories.
  *
  * VeSync migrated login to a two-step "authorize code" flow (see `login`
- * below) — the older single-call `/cloud/v1/user/login` endpoint with an
- * MD5-hashed password is deprecated and now rejected with a misleading
- * "app version is too low" error regardless of the appVersion value sent.
+ * below) — the older single-call `/cloud/v1/user/login` endpoint is
+ * deprecated and now rejected with a misleading "app version is too low"
+ * error regardless of the appVersion value sent. Each endpoint below also
+ * expects its own distinct set of field names (e.g. login uses
+ * `clientInfo`/`osInfo`/`clientVersion`/`appID`, while the device list and
+ * bypass calls use `phoneBrand`/`phoneOS`/`appVersion`) — these are not
+ * interchangeable, so each request body is built explicitly per endpoint
+ * rather than from one shared "defaults" object.
  *
  * The login and device-list calls below follow the well-documented, stable
  * part of that protocol (identical across VeSync's whole device lineup).
@@ -27,22 +32,27 @@ import type { VeSyncCredentials, VeSyncDevice, VeSyncSession, WeightReading } fr
 
 const BASE_URL = 'https://smartapi.vesync.com';
 const APP_VERSION = '5.6.60';
+const CLIENT_VERSION = `VeSync ${APP_VERSION}`;
 const APP_ID = 'eldodkfj';
 const CLIENT_TYPE = 'vesyncApp';
 const PHONE_BRAND = 'BariApp';
 const PHONE_OS = 'iOS';
-const USER_TYPE = '1';
 const ACCEPT_LANGUAGE = 'en';
 const REGION = 'US';
 const TIME_ZONE = 'America/New_York';
 
-/** A random per-install id VeSync's newer endpoints expect alongside terminalId. */
-let cachedMobileId: string | null = null;
-function getMobileId(): string {
-  if (!cachedMobileId) {
-    cachedMobileId = String(Math.floor(1_000_000_000_000_000 + Math.random() * 9_000_000_000_000_000));
-  }
-  return cachedMobileId;
+let traceCounter = 0;
+/** Mirrors pyvesync's DefaultValues.newTraceId() shape: not strictly validated, but matched for fidelity. */
+function newTraceId(terminalId: string): string {
+  traceCounter += 1;
+  const suffix = terminalId.replace(/-/g, '').slice(-4);
+  return `APP${suffix}${Math.floor(Date.now() / 1000)}-${String(traceCounter).padStart(5, '0')}`;
+}
+
+async function md5Hex(input: string): Promise<string> {
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.MD5, input, {
+    encoding: Crypto.CryptoEncoding.HEX,
+  });
 }
 
 /** Flip on to log raw VeSync responses to the Metro console while wiring up a real account/scale. */
@@ -74,46 +84,44 @@ async function postJson<T>(path: string, body: Record<string, unknown>): Promise
   return data;
 }
 
-/** Default fields VeSync's newer endpoints expect on every request, beyond the call-specific ones. */
-function defaultFields(terminalId: string) {
-  return {
-    acceptLanguage: ACCEPT_LANGUAGE,
-    appVersion: APP_VERSION,
-    appId: APP_ID,
-    clientType: CLIENT_TYPE,
-    phoneBrand: PHONE_BRAND,
-    phoneOS: PHONE_OS,
-    mobileId: getMobileId(),
-    deviceRegion: REGION,
-    countryCode: REGION,
-    userCountryCode: REGION,
-    terminalId,
-    timeZone: TIME_ZONE,
-    traceId: String(Date.now()),
-    userType: USER_TYPE,
-    debugMode: false,
-  };
-}
-
 export class VeSyncAuthError extends Error {}
 
 /**
  * Two-step login: exchange email+password for a short-lived authorize code,
  * then exchange that code for a session token. Replaces VeSync's old
- * single-call, MD5-hashed-password `/cloud/v1/user/login` endpoint, which
- * is now deprecated and rejected server-side.
+ * single-call `/cloud/v1/user/login` endpoint, which is now deprecated and
+ * rejected server-side. The password is still MD5-hashed (mirrors
+ * `RequestGetTokenModel.__post_init__` in pyvesync), and this step's body
+ * shape (`clientInfo`/`osInfo`/`clientVersion`/`appID`/`sourceAppID`) is
+ * distinct from every other endpoint's fields.
  */
 export async function login(
   credentials: VeSyncCredentials,
   terminalId: string,
 ): Promise<VeSyncSession> {
+  const hashedPassword = await md5Hex(credentials.password);
+
   const authData = await postJson<{ accountID: string; authorizeCode: string }>(
     '/globalPlatform/api/accountAuth/v1/authByPWDOrOTM',
     {
-      ...defaultFields(terminalId),
       email: credentials.email,
-      password: credentials.password,
       method: 'authByPWDOrOTM',
+      password: hashedPassword,
+      acceptLanguage: ACCEPT_LANGUAGE,
+      accountID: '',
+      authProtocolType: 'generic',
+      clientInfo: PHONE_BRAND,
+      clientType: CLIENT_TYPE,
+      clientVersion: CLIENT_VERSION,
+      debugMode: false,
+      osInfo: PHONE_OS,
+      terminalId,
+      timeZone: TIME_ZONE,
+      token: '',
+      userCountryCode: REGION,
+      appID: APP_ID,
+      sourceAppID: APP_ID,
+      traceId: newTraceId(terminalId),
     },
   );
 
@@ -128,10 +136,21 @@ export async function login(
   const loginData = await postJson<{ token: string; accountID: string }>(
     '/user/api/accountManage/v1/loginByAuthorizeCode4Vesync',
     {
-      ...defaultFields(terminalId),
       method: 'loginByAuthorizeCode4Vesync',
       authorizeCode,
+      acceptLanguage: ACCEPT_LANGUAGE,
+      accountID: '',
+      clientInfo: PHONE_BRAND,
+      clientType: CLIENT_TYPE,
+      clientVersion: CLIENT_VERSION,
+      debugMode: false,
       emailSubscriptions: false,
+      osInfo: PHONE_OS,
+      terminalId,
+      timeZone: TIME_ZONE,
+      token: '',
+      userCountryCode: REGION,
+      traceId: newTraceId(terminalId),
     },
   );
 
@@ -146,10 +165,15 @@ export async function login(
 
 export async function listDevices(session: VeSyncSession): Promise<VeSyncDevice[]> {
   const data = await postJson<{ list: VeSyncDevice[] }>('/cloud/v1/deviceManaged/devices', {
-    ...defaultFields(session.terminalId),
     method: 'devices',
     accountID: session.accountId,
     token: session.token,
+    timeZone: TIME_ZONE,
+    appVersion: APP_VERSION,
+    phoneBrand: PHONE_BRAND,
+    phoneOS: PHONE_OS,
+    acceptLanguage: ACCEPT_LANGUAGE,
+    traceId: newTraceId(session.terminalId),
     pageNo: 1,
     pageSize: 100,
   });
@@ -202,19 +226,33 @@ function toWeightReading(raw: RawScaleReading, fallbackId: string): WeightReadin
   };
 }
 
+/**
+ * NOTE: newer VeSync device categories may expect a nested
+ * `{ deviceId, configModel, payload: { method, source, data } }` shape
+ * instead of this flat `jsonCmd` envelope — unconfirmed for the scale
+ * category specifically. If scale reads fail here (see
+ * DEBUG_LOG_RAW_RESPONSES), check the raw response `msg` first.
+ */
 async function bypassCommand<T>(
   session: VeSyncSession,
   device: VeSyncDevice,
   jsonCmd: Record<string, unknown>,
 ): Promise<T | null> {
   const data = await postJson<{ result?: T }>('/cloud/v1/deviceManaged/bypassV2', {
-    ...defaultFields(session.terminalId),
     method: 'bypassV2',
     accountID: session.accountId,
     token: session.token,
     cid: device.cid,
     uuid: device.uuid,
     configModule: device.configModule,
+    acceptLanguage: ACCEPT_LANGUAGE,
+    appVersion: APP_VERSION,
+    phoneBrand: PHONE_BRAND,
+    phoneOS: PHONE_OS,
+    timeZone: TIME_ZONE,
+    userCountryCode: REGION,
+    debugMode: false,
+    traceId: newTraceId(session.terminalId),
     jsonCmd,
   });
 
