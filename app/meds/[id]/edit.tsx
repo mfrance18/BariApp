@@ -26,8 +26,10 @@ const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 interface ScheduleDraft {
   id?: number;
+  /** 1-12, paired with `period` — not 24-hour. */
   hour: string;
   minute: string;
+  period: 'AM' | 'PM';
   days: number[];
 }
 
@@ -36,7 +38,23 @@ function pad(n: string): string {
 }
 
 function newScheduleDraft(): ScheduleDraft {
-  return { hour: '08', minute: '00', days: [...ALL_DAYS] };
+  return { hour: '8', minute: '00', period: 'AM', days: [...ALL_DAYS] };
+}
+
+/** "20:00" -> { hour: '8', minute: '00', period: 'PM' } */
+function timeOfDayTo12Hour(timeOfDay: string): { hour: string; minute: string; period: 'AM' | 'PM' } {
+  const [h, m] = timeOfDay.split(':');
+  const hour24 = Number(h);
+  const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return { hour: String(hour12), minute: m, period };
+}
+
+/** { hour: '8', minute: '00', period: 'PM' } -> "20:00" */
+function to24HourTimeOfDay(hour: string, minute: string, period: 'AM' | 'PM'): string {
+  const hour12 = Number(hour) % 12;
+  const hour24 = period === 'PM' ? hour12 + 12 : hour12;
+  return `${pad(String(hour24))}:${pad(minute)}`;
 }
 
 export default function EditVitaminMedScreen() {
@@ -75,8 +93,7 @@ export default function EditVitaminMedScreen() {
     setSchedules(
       schedulesQuery.data.map((s) => ({
         id: s.id,
-        hour: s.timeOfDay.split(':')[0],
-        minute: s.timeOfDay.split(':')[1],
+        ...timeOfDayTo12Hour(s.timeOfDay),
         days: s.daysOfWeek.split(',').map(Number),
       })),
     );
@@ -130,7 +147,7 @@ export default function EditVitaminMedScreen() {
       }
 
       for (const s of schedules) {
-        const timeOfDay = `${pad(s.hour)}:${pad(s.minute)}`;
+        const timeOfDay = to24HourTimeOfDay(s.hour, s.minute, s.period);
         const daysOfWeek = s.days.join(',');
         if (s.id != null) {
           await updateSchedule(s.id, { timeOfDay, daysOfWeek });
@@ -215,6 +232,16 @@ export default function EditVitaminMedScreen() {
               keyboardType="number-pad"
               maxLength={2}
             />
+            <View style={styles.periodControl}>
+              <SegmentedControl
+                options={[
+                  { label: 'AM', value: 'AM' as const },
+                  { label: 'PM', value: 'PM' as const },
+                ]}
+                value={schedule.period}
+                onChange={(period) => updateSchedule_(index, { period })}
+              />
+            </View>
             <TouchableOpacity style={styles.removeButton} onPress={() => removeScheduleDraft(index)} hitSlop={8}>
               <Text style={styles.removeLink}>Remove</Text>
             </TouchableOpacity>
@@ -331,7 +358,7 @@ const styles = StyleSheet.create({
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: spacing.sm,
   },
   timeInput: {
     width: 48,
@@ -347,6 +374,9 @@ const styles = StyleSheet.create({
   timeColon: {
     fontSize: 16,
     color: colors.textPrimary,
+  },
+  periodControl: {
+    width: 96,
   },
   removeButton: {
     marginLeft: 'auto',
