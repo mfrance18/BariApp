@@ -21,7 +21,12 @@ import type { VeSyncCredentials, VeSyncDevice, VeSyncSession, WeightReading } fr
  */
 
 const BASE_URL = 'https://smartapi.vesync.com';
-const APP_VERSION = '5.4.62';
+// VeSync's backend rejects login requests claiming an app version below
+// some server-side minimum ("app version is too low"), which creeps up
+// over time as they ship real app updates. If login starts failing with
+// that error again, check Settings > About in the actual VeSync app on
+// your phone for its current version number and swap it in here.
+const APP_VERSION = '5.9.60';
 const PHONE_BRAND = 'BariApp';
 const PHONE_OS = 'iOS';
 const USER_TYPE = '1';

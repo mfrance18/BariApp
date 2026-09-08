@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
@@ -19,6 +19,7 @@ export default function SettingsScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const passwordRef = useRef<TextInput>(null);
 
   const loginMutation = useMutation({
     mutationFn: () => login({ email, password }),
@@ -90,14 +91,22 @@ export default function SettingsScreen() {
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
+              returnKeyType="next"
+              onSubmitEditing={() => passwordRef.current?.focus()}
+              blurOnSubmit={false}
             />
             <TextInput
+              ref={passwordRef}
               style={styles.input}
               placeholder="Password"
               placeholderTextColor={colors.textMuted}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (email && password && !loginMutation.isPending) loginMutation.mutate();
+              }}
             />
             <AppButton
               title={loginMutation.isPending ? 'Connecting…' : 'Connect'}

@@ -22,6 +22,7 @@ export function AppButton({ title, onPress, variant = 'primary', disabled, loadi
       onPress={onPress}
       disabled={isDisabled}
       activeOpacity={0.8}
+      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
       {loading ? (
         <ActivityIndicator color={variant === 'primary' || variant === 'danger' ? '#fff' : colors.primary} />
