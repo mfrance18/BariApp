@@ -16,11 +16,17 @@ export async function getVitaminMedById(id: number): Promise<VitaminMed | null> 
   return rows[0] ?? null;
 }
 
+export async function getVitaminMedByBarcode(barcode: string): Promise<VitaminMed | null> {
+  const rows = await db.select().from(vitaminsMeds).where(eq(vitaminsMeds.barcode, barcode));
+  return rows[0] ?? null;
+}
+
 export async function createVitaminMed(input: {
   name: string;
   type: 'vitamin' | 'medication';
   dosageLabel: string | null;
   notes: string | null;
+  barcode?: string | null;
 }): Promise<VitaminMed> {
   const now = new Date().toISOString();
   const rows = await db
@@ -32,7 +38,13 @@ export async function createVitaminMed(input: {
 
 export async function updateVitaminMed(
   id: number,
-  patch: Partial<{ name: string; type: 'vitamin' | 'medication'; dosageLabel: string | null; notes: string | null }>,
+  patch: Partial<{
+    name: string;
+    type: 'vitamin' | 'medication';
+    dosageLabel: string | null;
+    notes: string | null;
+    barcode: string | null;
+  }>,
 ): Promise<void> {
   await db
     .update(vitaminsMeds)
@@ -40,11 +52,21 @@ export async function updateVitaminMed(
     .where(eq(vitaminsMeds.id, id));
 }
 
-export async function archiveVitaminMed(id: number): Promise<void> {
-  await db
-    .update(vitaminsMeds)
-    .set({ active: false, updatedAt: new Date().toISOString() })
-    .where(eq(vitaminsMeds.id, id));
+/**
+ * Permanently deletes a vitamin/medication along with its schedules and
+ * historical taken/skipped log — nothing else in the app references a
+ * vitamin/med, so unlike foods (which recipes depend on), there's no case
+ * to guard against here. Foreign keys aren't enforced at the SQLite
+ * connection level, so the schedule/log rows are removed explicitly rather
+ * than relying on the schema's onDelete: 'cascade' to do it.
+ */
+export async function deleteVitaminMed(id: number): Promise<void> {
+  const schedules = await db.select({ id: medSchedule.id }).from(medSchedule).where(eq(medSchedule.vitaminMedId, id));
+  for (const schedule of schedules) {
+    await db.delete(medLog).where(eq(medLog.medScheduleId, schedule.id));
+  }
+  await db.delete(medSchedule).where(eq(medSchedule.vitaminMedId, id));
+  await db.delete(vitaminsMeds).where(eq(vitaminsMeds.id, id));
 }
 
 export async function listSchedulesForVitaminMed(vitaminMedId: number): Promise<MedSchedule[]> {

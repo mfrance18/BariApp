@@ -43,6 +43,13 @@
       "when": 1788838000000,
       "tag": "0005_foods_hard_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788841000000,
+      "tag": "0006_vitamins_meds_barcode",
+      "breakpoints": true
     }
   ]
 }

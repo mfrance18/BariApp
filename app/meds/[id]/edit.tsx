@@ -3,22 +3,26 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BarcodeScanner } from '../../../src/components/BarcodeScanner';
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import {
-  archiveVitaminMed,
   createSchedule,
   createVitaminMed,
   deleteSchedule,
+  deleteVitaminMed,
+  getVitaminMedByBarcode,
   getVitaminMedById,
   listSchedulesForVitaminMed,
   updateSchedule,
   updateVitaminMed,
 } from '../../../src/db/repositories/medsRepo';
+import { lookupMedicationByBarcode } from '../../../src/services/medications/openFda';
 import { ensureNotificationPermission } from '../../../src/services/notifications/permissions';
 import { rescheduleAll } from '../../../src/services/notifications/scheduler';
 import { colors, radius, spacing, typography } from '../../../src/theme/theme';
@@ -79,9 +83,13 @@ export default function EditVitaminMedScreen() {
   const [dosageLabel, setDosageLabel] = useState('');
   const [notes, setNotes] = useState('');
   const [schedules, setSchedules] = useState<ScheduleDraft[]>(isNew ? [newScheduleDraft()] : []);
+  const [barcode, setBarcode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(isNew);
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scanStatus, setScanStatus] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const medQuery = useQuery({
     queryKey: ['vitaminsMeds', vitaminMedId],
@@ -102,6 +110,7 @@ export default function EditVitaminMedScreen() {
     setType(medQuery.data.type);
     setDosageLabel(medQuery.data.dosageLabel ?? '');
     setNotes(medQuery.data.notes ?? '');
+    setBarcode(medQuery.data.barcode ?? null);
     setSchedules(
       schedulesQuery.data.map((s) => ({
         id: s.id,
@@ -142,6 +151,39 @@ export default function EditVitaminMedScreen() {
     updateSchedule_(pickerIndex, { hour: String(hour12), minute: pad(String(date.getMinutes())), period });
   }
 
+  async function handleScanBarcode(scannedBarcode: string) {
+    try {
+      const existing = await getVitaminMedByBarcode(scannedBarcode);
+      if (existing && existing.id !== vitaminMedId) {
+        setScannerVisible(false);
+        router.replace(`/meds/${existing.id}/edit`);
+        return;
+      }
+
+      setBarcode(scannedBarcode);
+      const product = await lookupMedicationByBarcode(scannedBarcode);
+      if (!product) {
+        setScanStatus('Not recognized — barcode saved, enter the details manually.');
+        return;
+      }
+
+      if (product.brandName || product.genericName) {
+        setName(product.brandName ?? product.genericName!);
+      }
+      setType('medication');
+      const dosageInfo =
+        product.activeIngredients.length > 0
+          ? product.activeIngredients.map((ai) => `${ai.name} ${ai.strength}`).join(', ')
+          : product.dosageForm;
+      if (dosageInfo) setDosageLabel(dosageInfo);
+
+      setScanStatus(null);
+      setScannerVisible(false);
+    } catch (err) {
+      setScanStatus((err as Error).message);
+    }
+  }
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!name.trim()) throw new Error('Name is required');
@@ -154,6 +196,7 @@ export default function EditVitaminMedScreen() {
         type,
         dosageLabel: dosageLabel.trim() || null,
         notes: notes.trim() || null,
+        barcode,
       };
 
       let medId = vitaminMedId;
@@ -188,12 +231,17 @@ export default function EditVitaminMedScreen() {
       queryClient.invalidateQueries({ queryKey: ['medsChecklist'] });
       router.back();
     },
-    onError: (err: Error) => setError(err.message),
+    onError: (err: Error) =>
+      setError(
+        err.message.includes('idx_vitamins_meds_barcode')
+          ? 'Another vitamin/medication with this barcode already exists.'
+          : err.message,
+      ),
   });
 
-  const archiveMutation = useMutation({
+  const deleteMutation = useMutation({
     mutationFn: async () => {
-      await archiveVitaminMed(vitaminMedId!);
+      await deleteVitaminMed(vitaminMedId!);
       await rescheduleAll();
     },
     onSuccess: () => {
@@ -201,7 +249,15 @@ export default function EditVitaminMedScreen() {
       queryClient.invalidateQueries({ queryKey: ['medsChecklist'] });
       router.back();
     },
+    onError: (err: Error) => Alert.alert('Could not delete', err.message),
   });
+
+  function confirmDelete() {
+    Alert.alert('Delete', `Permanently delete "${name}"? This also removes its reminder history. This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate() },
+    ]);
+  }
 
   if (!isNew && !initialized) {
     return (
@@ -221,6 +277,15 @@ export default function EditVitaminMedScreen() {
       extraScrollHeight={120}
       keyboardOpeningTime={0}
     >
+      <AppButton
+        title="Scan Barcode"
+        variant="secondary"
+        onPress={() => {
+          setScanStatus(null);
+          setScannerVisible(true);
+        }}
+      />
+
       <Card style={styles.card}>
         <Field label="Name" value={name} onChangeText={setName} />
 
@@ -283,7 +348,12 @@ export default function EditVitaminMedScreen() {
 
       {!isNew && (
         <View style={styles.deleteRow}>
-          <AppButton title="Archive" variant="danger" onPress={() => archiveMutation.mutate()} />
+          <AppButton
+            title={deleteMutation.isPending ? 'Deleting…' : 'Delete'}
+            variant="danger"
+            onPress={confirmDelete}
+            disabled={deleteMutation.isPending}
+          />
         </View>
       )}
 
@@ -291,6 +361,14 @@ export default function EditVitaminMedScreen() {
         <DateTimePicker value={scheduleToDate(schedules[pickerIndex])} mode="time" display="default" onChange={handleTimeChange} />
       )}
     </KeyboardAwareScrollView>
+    <Modal visible={scannerVisible} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
+      <View style={styles.scannerModal}>
+        <BarcodeScanner onScanned={handleScanBarcode} statusText={scanStatus ?? undefined} />
+        <View style={[styles.scannerCloseRow, { paddingBottom: 16 + insets.bottom }]}>
+          <AppButton title="Done" onPress={() => setScannerVisible(false)} />
+        </View>
+      </View>
+    </Modal>
     {Platform.OS === 'ios' && (
       <Modal visible={pickerIndex != null} transparent animationType="slide" onRequestClose={() => setPickerIndex(null)}>
         <View style={styles.pickerModalOverlay}>
@@ -437,6 +515,14 @@ const styles = StyleSheet.create({
   },
   deleteRow: {
     marginTop: spacing.sm,
+  },
+  scannerModal: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  scannerCloseRow: {
+    padding: spacing.lg,
+    backgroundColor: colors.background,
   },
   pickerModalOverlay: {
     flex: 1,

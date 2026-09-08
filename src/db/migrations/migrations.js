@@ -7,6 +7,7 @@ import m0002 from './0002_serving_amount_unit.sql';
 import m0003 from './0003_meal_log_quantity.sql';
 import m0004 from './0004_serving_weight_g.sql';
 import m0005 from './0005_foods_hard_delete.sql';
+import m0006 from './0006_vitamins_meds_barcode.sql';
 
   export default {
     journal,
@@ -16,6 +17,7 @@ m0001,
 m0002,
 m0003,
 m0004,
-m0005
+m0005,
+m0006
     }
   }

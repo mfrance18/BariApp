@@ -113,15 +113,20 @@ export const fluidLog = sqliteTable(
   (table) => [index('idx_fluid_log_log_date').on(table.logDate)],
 );
 
-export const vitaminsMeds = sqliteTable('vitamins_meds', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  name: text('name').notNull(),
-  type: text('type', { enum: ['vitamin', 'medication'] }).notNull(),
-  dosageLabel: text('dosage_label'),
-  notes: text('notes'),
-  active: integer('active', { mode: 'boolean' }).notNull().default(true),
-  ...timestamps,
-});
+export const vitaminsMeds = sqliteTable(
+  'vitamins_meds',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    name: text('name').notNull(),
+    type: text('type', { enum: ['vitamin', 'medication'] }).notNull(),
+    dosageLabel: text('dosage_label'),
+    notes: text('notes'),
+    barcode: text('barcode'),
+    active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex('idx_vitamins_meds_barcode').on(table.barcode)],
+);
 
 export const medSchedule = sqliteTable(
   'med_schedule',
