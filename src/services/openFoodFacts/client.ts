@@ -5,8 +5,6 @@ const FIELDS = [
   'code',
   'product_name',
   'brands',
-  'generic_name',
-  'categories',
   'nutriments',
   'serving_size',
   'serving_quantity',
@@ -38,11 +36,9 @@ function normalizeForMatch(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-/** All the text a product could plausibly be found by, normalized and joined. */
+/** The text a product is actually shown by in the UI (name + brand), normalized and joined. */
 function productHaystack(product: OffProduct): string {
-  return normalizeForMatch(
-    [product.product_name, product.brands, product.generic_name, product.categories].filter(Boolean).join(' '),
-  );
+  return normalizeForMatch([product.product_name, product.brands].filter(Boolean).join(' '));
 }
 
 /**
@@ -52,13 +48,15 @@ function productHaystack(product: OffProduct): string {
  * apart from "the request failed" rather than showing both identically.
  *
  * OFF's own search matches loosely (it can surface a product via a
- * category, generic name, or ingredients text that never appears in what
- * this app displays, so a result can look completely unrelated). Treat OFF
- * as a candidate source only: fetch a larger pool, then keep just the
- * products where every word of the query actually appears — as a
- * substring, ignoring spacing/punctuation — somewhere across the fields
- * shown to the user (name, brand, generic name, category), and rank an
- * exact contiguous phrase match above a same-words-anywhere match.
+ * category, ingredients text, or other field this app never shows, so a
+ * result can look completely unrelated to what was typed). Treat OFF as a
+ * candidate source only: fetch a larger pool, then keep just the products
+ * where every word of the query actually appears — as a substring,
+ * ignoring spacing/punctuation — in the SAME text the user sees (name and
+ * brand only, deliberately not category/generic-name/etc., since matching
+ * through a field the row doesn't display is indistinguishable from a
+ * wrong result to the user), and rank an exact contiguous phrase match
+ * above a same-words-anywhere match.
  */
 export async function searchProductsByName(query: string, limit = 24): Promise<OffProduct[]> {
   const trimmed = query.trim();
