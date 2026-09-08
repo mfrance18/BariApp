@@ -38,7 +38,9 @@ export default function NewFoodScreen() {
           params: { mealType: params.logMealType, itemType: 'food', itemId: String(food.id), logDate: params.logDate },
         });
       } else {
-        router.back();
+        Alert.alert('Saved', `"${food.name}" (id ${food.id}) was added to your library.`, [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
       }
     },
     onError: (error: Error) => {

@@ -100,7 +100,11 @@ export default function LibraryScreen() {
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
-          ListEmptyComponent={<Text style={styles.emptyText}>No foods yet.</Text>}
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              {foodsQuery.isError ? `Couldn't load foods: ${(foodsQuery.error as Error).message}` : 'No foods yet.'}
+            </Text>
+          }
         />
       ) : (
         <FlatList
