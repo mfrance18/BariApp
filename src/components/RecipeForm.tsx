@@ -20,7 +20,9 @@ import { OffFoodResults } from './OffFoodResults';
 
 export interface RecipeIngredientDraft {
   food: Food;
-  quantityG: string;
+  /** As entered by the user (e.g. "8" + "oz") — converted to grams only at parse/preview time. */
+  quantityAmount: string;
+  quantityUnit: string;
 }
 
 export interface RecipeFormValues {
@@ -48,17 +50,23 @@ export function parseRecipeFormValues(values: RecipeFormValues): ParsedRecipeVal
   if (!values.name.trim()) return { error: 'Name is required' };
   const servings = Number(values.servings);
   if (!servings || servings <= 0) return { error: 'Servings must be greater than 0' };
+  const ingredients: { foodId: number; quantityG: number }[] = [];
   for (const ingredient of values.ingredients) {
-    const qty = Number(ingredient.quantityG);
-    if (!qty || qty <= 0) {
-      return { error: `Enter a valid quantity (g) for ${ingredient.food.name}` };
+    const amount = Number(ingredient.quantityAmount);
+    if (!amount || amount <= 0) {
+      return { error: `Enter a valid amount for ${ingredient.food.name}` };
     }
+    const grams = servingToGrams(amount, ingredient.quantityUnit);
+    if (grams == null) {
+      return { error: `"${ingredient.quantityUnit}" isn't a recognized weight unit for ${ingredient.food.name}` };
+    }
+    ingredients.push({ foodId: ingredient.food.id, quantityG: grams });
   }
   return {
     name: values.name.trim(),
     servings,
     notes: values.notes.trim() || null,
-    ingredients: values.ingredients.map((i) => ({ foodId: i.food.id, quantityG: Number(i.quantityG) })),
+    ingredients,
   };
 }
 
@@ -103,8 +111,8 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const preview = useMemo(() => {
     const servingsNum = Number(servings) || 1;
     const validIngredients = ingredients
-      .map((i) => ({ food: i.food, quantityG: Number(i.quantityG) }))
-      .filter((i) => i.quantityG > 0);
+      .map((i) => ({ food: i.food, quantityG: servingToGrams(Number(i.quantityAmount), i.quantityUnit) }))
+      .filter((i): i is { food: Food; quantityG: number } => i.quantityG != null && i.quantityG > 0);
     if (validIngredients.length === 0) return null;
     try {
       const { totals } = computeRecipeTotals(validIngredients);
@@ -156,12 +164,14 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       return;
     }
     const unit = quantityUnit.trim() || 'g';
-    const grams = servingToGrams(amount, unit);
-    if (grams == null) {
+    if (servingToGrams(amount, unit) == null) {
       setQuantityError(`"${unit}" isn't a recognized weight unit (try g, oz, lb, kg, ml)`);
       return;
     }
-    setIngredients((prev) => [...prev, { food: pendingIngredient, quantityG: String(grams) }]);
+    setIngredients((prev) => [
+      ...prev,
+      { food: pendingIngredient, quantityAmount: String(amount), quantityUnit: unit },
+    ]);
     setSearchText('');
     setPendingIngredient(null);
     setQuantityError(null);
@@ -217,8 +227,12 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     setIngredients((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function setIngredientQuantity(index: number, quantityG: string) {
-    setIngredients((prev) => prev.map((ing, i) => (i === index ? { ...ing, quantityG } : ing)));
+  function setIngredientAmount(index: number, quantityAmount: string) {
+    setIngredients((prev) => prev.map((ing, i) => (i === index ? { ...ing, quantityAmount } : ing)));
+  }
+
+  function setIngredientUnit(index: number, quantityUnit: string) {
+    setIngredients((prev) => prev.map((ing, i) => (i === index ? { ...ing, quantityUnit } : ing)));
   }
 
   function handleSubmit() {
@@ -300,11 +314,16 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
           <Text style={styles.ingredientName}>{item.food.name}</Text>
           <TextInput
             style={styles.quantityInput}
-            value={item.quantityG}
-            onChangeText={(v) => setIngredientQuantity(index, v)}
+            value={item.quantityAmount}
+            onChangeText={(v) => setIngredientAmount(index, v)}
             keyboardType="decimal-pad"
           />
-          <Text style={styles.gramsLabel}>g</Text>
+          <TextInput
+            style={styles.unitInput}
+            value={item.quantityUnit}
+            onChangeText={(v) => setIngredientUnit(index, v)}
+            autoCapitalize="none"
+          />
           <TouchableOpacity onPress={() => removeIngredient(index)} hitSlop={8}>
             <Ionicons name="close-circle" size={20} color={colors.textMuted} />
           </TouchableOpacity>
@@ -527,7 +546,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   quantityInput: {
-    width: 60,
+    width: 56,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     borderRadius: radius.sm,
@@ -536,8 +555,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     color: colors.textPrimary,
   },
-  gramsLabel: {
-    color: colors.textMuted,
+  unitInput: {
+    width: 52,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    color: colors.textPrimary,
   },
   emptyText: {
     color: colors.textMuted,

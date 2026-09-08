@@ -18,7 +18,10 @@ function recipeToFormValues(recipe: RecipeWithIngredients): RecipeFormValues {
     notes: recipe.notes ?? '',
     ingredients: recipe.ingredients.map((ingredient) => ({
       food: ingredient.food,
-      quantityG: String(ingredient.quantityG),
+      // Only grams are persisted, so an edited recipe reopens in grams even
+      // if it was originally entered in another unit (e.g. oz).
+      quantityAmount: String(ingredient.quantityG),
+      quantityUnit: 'g',
     })),
   };
 }
