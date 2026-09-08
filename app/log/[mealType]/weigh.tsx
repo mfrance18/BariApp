@@ -5,6 +5,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
+import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
@@ -184,7 +185,8 @@ export default function WeighScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingScreen>
+      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Text style={styles.itemName}>{itemName}</Text>
       <Text style={styles.mealLabel}>Logging to {mealType}</Text>
 
@@ -249,7 +251,8 @@ export default function WeighScreen() {
         onPress={() => mutation.mutate()}
         disabled={mutation.isPending || !preview}
       />
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }
 
@@ -274,6 +277,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
     gap: spacing.md,
   },
   center: {

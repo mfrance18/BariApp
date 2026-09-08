@@ -5,6 +5,7 @@ import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'r
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
+import { KeyboardAvoidingScreen } from '../../src/components/ui/KeyboardAvoidingScreen';
 import { createEntry, deleteEntry, listEntriesForDate, type FluidLogEntry } from '../../src/db/repositories/fluidRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
@@ -46,9 +47,11 @@ export default function FluidsScreen() {
   const progress = Math.min(1, totalOz / goalOz);
 
   return (
+    <KeyboardAvoidingScreen>
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
       data={entries ?? []}
       keyExtractor={(item) => String(item.id)}
       ListHeaderComponent={
@@ -101,6 +104,7 @@ export default function FluidsScreen() {
       renderItem={({ item }) => <FluidRow entry={item} onDelete={() => deleteMutation.mutate(item.id)} />}
       ListEmptyComponent={<Text style={styles.emptyText}>Nothing logged yet today</Text>}
     />
+    </KeyboardAvoidingScreen>
   );
 }
 

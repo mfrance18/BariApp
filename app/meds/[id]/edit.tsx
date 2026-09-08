@@ -5,6 +5,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOp
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
+import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import {
   archiveVitaminMed,
@@ -170,7 +171,8 @@ export default function EditVitaminMedScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingScreen>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Card style={styles.card}>
         <Field label="Name" value={name} onChangeText={setName} />
 
@@ -246,6 +248,7 @@ export default function EditVitaminMedScreen() {
         </View>
       )}
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }
 

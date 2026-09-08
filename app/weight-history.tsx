@@ -5,6 +5,7 @@ import { LineChart } from 'react-native-chart-kit';
 
 import { AppButton } from '../src/components/ui/AppButton';
 import { Card } from '../src/components/ui/Card';
+import { KeyboardAvoidingScreen } from '../src/components/ui/KeyboardAvoidingScreen';
 import { getSettings } from '../src/db/repositories/settingsRepo';
 import { addManualWeight, listWeightLog, type WeightLogEntry } from '../src/db/repositories/weightRepo';
 import { syncWeightHistoryToDb } from '../src/services/vesync/adapter';
@@ -45,9 +46,11 @@ export default function WeightHistoryScreen() {
   }
 
   return (
+    <KeyboardAvoidingScreen>
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
       data={entries ?? []}
       keyExtractor={(item) => String(item.id)}
       ListHeaderComponent={
@@ -103,6 +106,7 @@ export default function WeightHistoryScreen() {
       renderItem={({ item }) => <WeightRow entry={item} unit={unit} toDisplayUnit={toDisplayUnit} />}
       ListEmptyComponent={<Text style={styles.emptyText}>No weight history yet</Text>}
     />
+    </KeyboardAvoidingScreen>
   );
 }
 

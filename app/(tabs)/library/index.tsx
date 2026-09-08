@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppButton } from '../../../src/components/ui/AppButton';
+import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { listFoods } from '../../../src/db/repositories/foodsRepo';
 import { listRecipes } from '../../../src/db/repositories/recipesRepo';
@@ -40,6 +41,7 @@ export default function LibraryScreen() {
   );
 
   return (
+    <KeyboardAvoidingScreen>
     <View style={styles.container}>
       <SegmentedControl
         options={[
@@ -84,6 +86,7 @@ export default function LibraryScreen() {
 
       {activeTab === 'foods' ? (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           data={foodsQuery.data ?? []}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
@@ -108,6 +111,7 @@ export default function LibraryScreen() {
         />
       ) : (
         <FlatList
+          keyboardShouldPersistTaps="handled"
           data={recipesQuery.data ?? []}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
@@ -128,6 +132,7 @@ export default function LibraryScreen() {
         />
       )}
     </View>
+    </KeyboardAvoidingScreen>
   );
 }
 

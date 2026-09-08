@@ -4,6 +4,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
+import { KeyboardAvoidingScreen } from '../../src/components/ui/KeyboardAvoidingScreen';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { login, logout, syncWeightHistoryToDb } from '../../src/services/vesync/adapter';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
@@ -48,7 +49,8 @@ export default function SettingsScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <KeyboardAvoidingScreen>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <Section title="VeSync Scale">
         {settings.vesyncConnected ? (
           <>
@@ -111,6 +113,7 @@ export default function SettingsScreen() {
         <SettingsRow label="Weight unit" value={settings.weightUnit} />
       </Section>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }
 
@@ -139,6 +142,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    paddingBottom: spacing.xl * 2,
     gap: spacing.md,
   },
   center: {

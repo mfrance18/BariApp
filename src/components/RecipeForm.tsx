@@ -10,6 +10,7 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
+import { KeyboardAvoidingScreen } from './ui/KeyboardAvoidingScreen';
 
 export interface RecipeIngredientDraft {
   food: Food;
@@ -136,9 +137,11 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   }
 
   return (
+    <KeyboardAvoidingScreen>
     <FlatList
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+      keyboardShouldPersistTaps="handled"
       data={ingredients}
       keyExtractor={(item, index) => `${item.food.id}-${index}`}
       ListHeaderComponent={
@@ -219,6 +222,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         </View>
       }
     />
+    </KeyboardAvoidingScreen>
   );
 }
 

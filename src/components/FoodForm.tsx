@@ -7,6 +7,7 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
+import { KeyboardAvoidingScreen } from './ui/KeyboardAvoidingScreen';
 
 export interface FoodFormValues {
   name: string;
@@ -158,9 +159,11 @@ export function FoodForm({
     values.servingAmount && values.servingUnit ? `${values.servingAmount} ${values.servingUnit}` : 'serving';
 
   return (
+    <KeyboardAvoidingScreen>
     <ScrollView
       style={styles.container}
       contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+      keyboardShouldPersistTaps="handled"
     >
       {onScanBarcode && <AppButton title="Scan Barcode" variant="secondary" onPress={onScanBarcode} />}
 
@@ -244,6 +247,7 @@ export function FoodForm({
         )}
       </View>
     </ScrollView>
+    </KeyboardAvoidingScreen>
   );
 }
 
