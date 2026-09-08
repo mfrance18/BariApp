@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -132,10 +132,86 @@ export function FoodForm({
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+  const prevServingRef = useRef({ amount: initialValues.servingAmount, unit: initialValues.servingUnit });
 
   function set<K extends keyof FoodFormValues>(key: K, value: FoodFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
   }
+
+  // Rescales nutrition (and, for a non-weighable unit, the weight
+  // equivalent) whenever the serving amount/unit changes, so they stay
+  // consistent with whatever was last entered instead of going stale.
+  // Reads the current field values fresh from the updater's `current`, so a
+  // manual edit to any of them is always what the next rescale starts from.
+  useEffect(() => {
+    const prev = prevServingRef.current;
+    prevServingRef.current = { amount: values.servingAmount, unit: values.servingUnit };
+    if (prev.amount === values.servingAmount && prev.unit === values.servingUnit) return;
+
+    const prevAmount = Number(prev.amount);
+    const newAmount = Number(values.servingAmount);
+    if (!prevAmount || prevAmount <= 0 || !newAmount || newAmount <= 0) return;
+
+    let ratio: number | null = null;
+    if (isWeighableUnit(prev.unit) && isWeighableUnit(values.servingUnit)) {
+      const prevGrams = servingToGrams(prevAmount, prev.unit);
+      const newGrams = servingToGrams(newAmount, values.servingUnit);
+      if (prevGrams != null && newGrams != null && prevGrams > 0) ratio = newGrams / prevGrams;
+    } else if (prev.unit.trim().toLowerCase() === values.servingUnit.trim().toLowerCase()) {
+      // Same (possibly non-weighable) unit, only the amount changed — scale by that alone.
+      ratio = newAmount / prevAmount;
+    }
+    // Otherwise the unit changed to something we can't relate to the old one
+    // (e.g. "bottle" to "scoop") — leave the values as entered.
+    if (ratio == null) return;
+    const appliedRatio = ratio;
+
+    setValues((current) => {
+      const num = (s: string) => (s.trim() ? Number(s) : 0);
+      const hasNutrition = [
+        current.calories,
+        current.proteinG,
+        current.carbsG,
+        current.fatG,
+        current.fiberG,
+        current.sugarG,
+        current.sodiumMg,
+      ].some((v) => v.trim() !== '' && Number(v) !== 0);
+
+      const scaledNutrition = hasNutrition
+        ? roundNutritionForDisplay({
+            calories: num(current.calories) * appliedRatio,
+            proteinG: num(current.proteinG) * appliedRatio,
+            carbsG: num(current.carbsG) * appliedRatio,
+            fatG: num(current.fatG) * appliedRatio,
+            fiberG: num(current.fiberG) * appliedRatio,
+            sugarG: num(current.sugarG) * appliedRatio,
+            sodiumMg: num(current.sodiumMg) * appliedRatio,
+          })
+        : null;
+
+      const scaledWeightAmount =
+        !isWeighableUnit(current.servingUnit) && current.servingWeightAmount.trim()
+          ? String(Math.round(Number(current.servingWeightAmount) * appliedRatio * 100) / 100)
+          : current.servingWeightAmount;
+
+      if (!scaledNutrition && scaledWeightAmount === current.servingWeightAmount) return current;
+
+      return {
+        ...current,
+        ...(scaledNutrition && {
+          calories: String(scaledNutrition.calories),
+          proteinG: String(scaledNutrition.proteinG),
+          carbsG: String(scaledNutrition.carbsG),
+          fatG: String(scaledNutrition.fatG),
+          fiberG: String(scaledNutrition.fiberG),
+          sugarG: String(scaledNutrition.sugarG),
+          sodiumMg: String(scaledNutrition.sodiumMg),
+        }),
+        servingWeightAmount: scaledWeightAmount,
+      };
+    });
+  }, [values.servingAmount, values.servingUnit]);
 
   function handleSubmit() {
     const parsed = parseFoodFormValues(values);
@@ -145,34 +221,6 @@ export function FoodForm({
     }
     setError(null);
     onSubmit(parsed);
-  }
-
-  function scaleValuesToServing() {
-    const amount = Number(values.servingAmount);
-    if (!amount || amount <= 0) return;
-    const grams = servingToGrams(amount, values.servingUnit);
-    if (grams == null) return;
-    const factor = grams / 100;
-    const num = (s: string) => (s.trim() ? Number(s) : 0);
-    const scaled = roundNutritionForDisplay({
-      calories: num(values.calories) * factor,
-      proteinG: num(values.proteinG) * factor,
-      carbsG: num(values.carbsG) * factor,
-      fatG: num(values.fatG) * factor,
-      fiberG: num(values.fiberG) * factor,
-      sugarG: num(values.sugarG) * factor,
-      sodiumMg: num(values.sodiumMg) * factor,
-    });
-    setValues((prev) => ({
-      ...prev,
-      calories: String(scaled.calories),
-      proteinG: String(scaled.proteinG),
-      carbsG: String(scaled.carbsG),
-      fatG: String(scaled.fatG),
-      fiberG: String(scaled.fiberG),
-      sugarG: String(scaled.sugarG),
-      sodiumMg: String(scaled.sodiumMg),
-    }));
   }
 
   const servingDescription =
@@ -269,16 +317,9 @@ export function FoodForm({
         <Field label="Fiber (g)" value={values.fiberG} onChangeText={(v) => set('fiberG', v)} keyboardType="decimal-pad" />
         <Field label="Sugar (g)" value={values.sugarG} onChangeText={(v) => set('sugarG', v)} keyboardType="decimal-pad" />
         <Field label="Sodium (mg)" value={values.sodiumMg} onChangeText={(v) => set('sodiumMg', v)} keyboardType="decimal-pad" />
-
-        {isWeighableUnit(values.servingUnit) && (
-          <View style={styles.scaleHelper}>
-            <AppButton title="Scale values above from per-100g to this serving" variant="secondary" onPress={scaleValuesToServing} />
-            <Text style={styles.helperCaption}>
-              If the numbers above are currently per 100g, this multiplies them by the serving size to fill in
-              per-serving values instead.
-            </Text>
-          </View>
-        )}
+        <Text style={styles.helperCaption}>
+          Changing the serving amount or unit above automatically rescales these values to match.
+        </Text>
       </Card>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -386,9 +427,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     fontSize: 13,
-  },
-  scaleHelper: {
-    gap: spacing.xs,
   },
   helperCaption: {
     fontSize: 12,
