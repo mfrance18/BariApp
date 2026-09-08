@@ -164,7 +164,7 @@ export function FoodForm({
       contentContainerStyle={StyleSheet.flatten([styles.content, { paddingBottom: 24 + insets.bottom }])}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
-      extraScrollHeight={24}
+      extraScrollHeight={120}
       keyboardOpeningTime={0}
     >
       {onScanBarcode && <AppButton title="Scan Barcode" variant="secondary" onPress={onScanBarcode} />}

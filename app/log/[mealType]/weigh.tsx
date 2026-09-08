@@ -190,7 +190,7 @@ export default function WeighScreen() {
       contentContainerStyle={StyleSheet.flatten(styles.content)}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
-      extraScrollHeight={24}
+      extraScrollHeight={120}
       keyboardOpeningTime={0}
     >
       <Text style={styles.itemName}>{itemName}</Text>

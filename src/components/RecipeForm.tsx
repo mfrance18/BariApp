@@ -142,7 +142,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       contentContainerStyle={StyleSheet.flatten([styles.content, { paddingBottom: 24 + insets.bottom }])}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
-      extraScrollHeight={24}
+      extraScrollHeight={120}
       keyboardOpeningTime={0}
       data={ingredients}
       keyExtractor={(item, index) => `${item.food.id}-${index}`}

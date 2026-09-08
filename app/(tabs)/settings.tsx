@@ -54,7 +54,7 @@ export default function SettingsScreen() {
       contentContainerStyle={StyleSheet.flatten(styles.content)}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
-      extraScrollHeight={24}
+      extraScrollHeight={120}
       keyboardOpeningTime={0}
     >
       <Section title="VeSync Scale">

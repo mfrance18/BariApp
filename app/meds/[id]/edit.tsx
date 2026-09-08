@@ -176,7 +176,7 @@ export default function EditVitaminMedScreen() {
       contentContainerStyle={StyleSheet.flatten(styles.content)}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
-      extraScrollHeight={24}
+      extraScrollHeight={120}
       keyboardOpeningTime={0}
     >
       <Card style={styles.card}>
