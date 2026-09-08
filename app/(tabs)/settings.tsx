@@ -1,15 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
-import { getSettings } from '../../src/db/repositories/settingsRepo';
+import { SegmentedControl } from '../../src/components/ui/SegmentedControl';
+import { getSettings, updateSettings, type AppSettings } from '../../src/db/repositories/settingsRepo';
 import { login, logout, syncWeightHistoryToDb } from '../../src/services/vesync/adapter';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { mlToOz } from '../../src/utils/units';
+import { mlToOz, ozToMl } from '../../src/utils/units';
+
+const WEIGHT_UNIT_OPTIONS: { label: string; value: AppSettings['weightUnit'] }[] = [
+  { label: 'lb', value: 'lb' },
+  { label: 'kg', value: 'kg' },
+];
 
 export default function SettingsScreen() {
   const queryClient = useQueryClient();
@@ -22,6 +28,20 @@ export default function SettingsScreen() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const passwordRef = useRef<TextInput>(null);
+
+  const [caloriesInput, setCaloriesInput] = useState('');
+  const [proteinInput, setProteinInput] = useState('');
+  const [fluidOzInput, setFluidOzInput] = useState('');
+  const goalsInitialized = useRef(false);
+
+  useEffect(() => {
+    if (settings && !goalsInitialized.current) {
+      setCaloriesInput(String(settings.dailyCalorieGoal));
+      setProteinInput(String(settings.dailyProteinGoalG));
+      setFluidOzInput(String(Math.round(mlToOz(settings.dailyFluidGoalMl))));
+      goalsInitialized.current = true;
+    }
+  }, [settings]);
 
   const loginMutation = useMutation({
     mutationFn: () => login({ email, password }),
@@ -42,6 +62,29 @@ export default function SettingsScreen() {
     mutationFn: () => syncWeightHistoryToDb(30),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['weightLog'] }),
   });
+
+  const saveGoalsMutation = useMutation({
+    mutationFn: () =>
+      updateSettings({
+        dailyCalorieGoal: Number(caloriesInput),
+        dailyProteinGoalG: Number(proteinInput),
+        dailyFluidGoalMl: Math.round(ozToMl(Number(fluidOzInput))),
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_settings'] }),
+  });
+
+  const weightUnitMutation = useMutation({
+    mutationFn: (unit: AppSettings['weightUnit']) => updateSettings({ weightUnit: unit }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_settings'] }),
+  });
+
+  const goalsValid =
+    Number(caloriesInput) > 0 && Number(proteinInput) > 0 && Number(fluidOzInput) > 0;
+  const goalsDirty =
+    !!settings &&
+    (Number(caloriesInput) !== settings.dailyCalorieGoal ||
+      Number(proteinInput) !== settings.dailyProteinGoalG ||
+      Math.round(ozToMl(Number(fluidOzInput))) !== settings.dailyFluidGoalMl);
 
   if (isLoading || !settings) {
     return (
@@ -135,12 +178,26 @@ export default function SettingsScreen() {
         )}
       </Section>
       <Section title="Daily Goals">
-        <SettingsRow label="Calories" value={`${settings.dailyCalorieGoal}`} />
-        <SettingsRow label="Protein" value={`${settings.dailyProteinGoalG} g`} />
-        <SettingsRow label="Fluid" value={`${mlToOz(settings.dailyFluidGoalMl).toFixed(0)} oz`} />
+        <GoalField label="Calories" unit="kcal" value={caloriesInput} onChangeText={setCaloriesInput} />
+        <GoalField label="Protein" unit="g" value={proteinInput} onChangeText={setProteinInput} />
+        <GoalField label="Fluid" unit="oz" value={fluidOzInput} onChangeText={setFluidOzInput} />
+        <AppButton
+          title={saveGoalsMutation.isPending ? 'Saving…' : 'Save Goals'}
+          onPress={() => saveGoalsMutation.mutate()}
+          disabled={!goalsValid || !goalsDirty || saveGoalsMutation.isPending}
+        />
+        {!goalsValid && <Text style={styles.errorText}>Goals must be greater than 0.</Text>}
+        {saveGoalsMutation.isSuccess && !goalsDirty && (
+          <Text style={styles.helperText}>Goals saved.</Text>
+        )}
       </Section>
       <Section title="Units">
-        <SettingsRow label="Weight unit" value={settings.weightUnit} />
+        <Text style={styles.rowText}>Weight unit</Text>
+        <SegmentedControl
+          options={WEIGHT_UNIT_OPTIONS}
+          value={settings.weightUnit}
+          onChange={(unit) => weightUnitMutation.mutate(unit)}
+        />
       </Section>
     </KeyboardAwareScrollView>
   );
@@ -155,11 +212,30 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function SettingsRow({ label, value }: { label: string; value: string }) {
+function GoalField({
+  label,
+  unit,
+  value,
+  onChangeText,
+}: {
+  label: string;
+  unit: string;
+  value: string;
+  onChangeText: (v: string) => void;
+}) {
   return (
-    <View style={styles.settingsRow}>
+    <View style={styles.goalRow}>
       <Text style={styles.rowText}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
+      <View style={styles.goalInputGroup}>
+        <TextInput
+          style={styles.goalInput}
+          value={value}
+          onChangeText={onChangeText}
+          keyboardType="decimal-pad"
+          selectTextOnFocus
+        />
+        <Text style={styles.goalUnit}>{unit}</Text>
+      </View>
     </View>
   );
 }
@@ -186,18 +262,35 @@ const styles = StyleSheet.create({
     ...typography.label,
     marginBottom: spacing.xs,
   },
-  settingsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
   rowText: {
     fontSize: 15,
     color: colors.textPrimary,
   },
-  rowValue: {
+  goalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  goalInputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  goalInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
     fontSize: 15,
-    fontWeight: '600',
+    color: colors.textPrimary,
+    minWidth: 70,
+    textAlign: 'right',
+  },
+  goalUnit: {
+    fontSize: 13,
     color: colors.textSecondary,
+    minWidth: 32,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
