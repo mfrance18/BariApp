@@ -1,4 +1,4 @@
-import { gramsPerUnit, isWeighableUnit, servingToGrams } from './servingUnits';
+import { gramsPerUnit, gramsToServing, isWeighableUnit, servingToGrams } from './servingUnits';
 
 describe('gramsPerUnit', () => {
   it('resolves common weight units case-insensitively', () => {
@@ -32,5 +32,20 @@ describe('servingToGrams', () => {
 
   it('returns null for a non-weighable unit', () => {
     expect(servingToGrams(1, 'bottle')).toBeNull();
+  });
+});
+
+describe('gramsToServing', () => {
+  it('divides grams by grams-per-unit for a weighable unit', () => {
+    expect(gramsToServing(2000, 'kg')).toBe(2);
+    expect(gramsToServing(453.592, 'lb')).toBeCloseTo(1);
+  });
+
+  it('is the inverse of servingToGrams for oz', () => {
+    expect(gramsToServing(servingToGrams(4, 'oz')!, 'oz')).toBeCloseTo(4);
+  });
+
+  it('returns null for a non-weighable unit', () => {
+    expect(gramsToServing(100, 'bottle')).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
+import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
@@ -23,7 +24,14 @@ import type { MealType } from '../../../src/services/nutrition/totals';
 import { getLatestWeight } from '../../../src/services/vesync/adapter';
 import { colors, radius, spacing, typography } from '../../../src/theme/theme';
 import { todayLogDateKey } from '../../../src/utils/date';
-import { isWeighableUnit } from '../../../src/utils/servingUnits';
+import { gramsToServing, isWeighableUnit, servingToGrams } from '../../../src/utils/servingUnits';
+
+type WeightUnit = 'g' | 'oz' | 'lb';
+const WEIGHT_UNIT_OPTIONS: { label: string; value: WeightUnit }[] = [
+  { label: 'g', value: 'g' },
+  { label: 'oz', value: 'oz' },
+  { label: 'lb', value: 'lb' },
+];
 
 const NUTRIENT_COLORS: Record<string, string> = {
   Calories: colors.primary,
@@ -44,7 +52,8 @@ export default function WeighScreen() {
     entryId?: string;
   }>();
   const queryClient = useQueryClient();
-  const [weightG, setWeightG] = useState('');
+  const [weightInput, setWeightInput] = useState('');
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>('g');
   const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
   const [scaleError, setScaleError] = useState<string | null>(null);
@@ -69,7 +78,9 @@ export default function WeighScreen() {
         return;
       }
       setScaleError(null);
-      setWeightG(String(Math.round(reading.weightKg * 1000)));
+      const grams = reading.weightKg * 1000;
+      const displayAmount = gramsToServing(grams, weightUnit) ?? grams;
+      setWeightInput(String(Math.round(displayAmount * 10) / 10));
       setWeightSource('vesync_scale');
     },
   });
@@ -100,7 +111,8 @@ export default function WeighScreen() {
     if (existingEntryQuery.data.quantityAmount != null) {
       setServingsInput(String(existingEntryQuery.data.quantityAmount));
     } else if (existingEntryQuery.data.weightG != null) {
-      setWeightG(String(existingEntryQuery.data.weightG));
+      setWeightUnit('g');
+      setWeightInput(String(existingEntryQuery.data.weightG));
     }
   }, [existingEntryQuery.data]);
 
@@ -114,7 +126,9 @@ export default function WeighScreen() {
   // For count-based foods there's no gram amount at all — nutrition is
   // simply the food's per-serving values times how many servings, using
   // scaleNutrition with a reference of "1 serving".
-  const measuredAmount = isCountBased ? Number(servingsInput) : Number(weightG);
+  const measuredAmount = isCountBased
+    ? Number(servingsInput)
+    : (servingToGrams(Number(weightInput), weightUnit) ?? 0);
 
   const preview: NutritionFields | null = useMemo(() => {
     if (!measuredAmount || measuredAmount <= 0) return null;
@@ -219,19 +233,37 @@ export default function WeighScreen() {
         </Card>
       ) : (
         <Card style={styles.field}>
-          <Text style={styles.fieldLabel}>Weight (g)</Text>
-          <TextInput
-            style={styles.input}
-            value={weightG}
-            onChangeText={(v) => {
-              setWeightG(v);
-              setWeightSource('manual');
-            }}
-            keyboardType="decimal-pad"
-            placeholder="e.g. 120"
-            placeholderTextColor={colors.textMuted}
-            autoFocus
-          />
+          <Text style={styles.fieldLabel}>Weight</Text>
+          <View style={styles.weightRow}>
+            <TextInput
+              style={[styles.input, styles.weightInput]}
+              value={weightInput}
+              onChangeText={(v) => {
+                setWeightInput(v);
+                setWeightSource('manual');
+              }}
+              keyboardType="decimal-pad"
+              placeholder={weightUnit === 'g' ? 'e.g. 120' : 'e.g. 4.2'}
+              placeholderTextColor={colors.textMuted}
+              autoFocus
+            />
+            <View style={styles.unitPicker}>
+              <SegmentedControl
+                options={WEIGHT_UNIT_OPTIONS}
+                value={weightUnit}
+                onChange={(unit) => {
+                  const grams = servingToGrams(Number(weightInput), weightUnit);
+                  if (grams != null && weightInput !== '') {
+                    const converted = gramsToServing(grams, unit);
+                    if (converted != null) {
+                      setWeightInput(String(Math.round(converted * 100) / 100));
+                    }
+                  }
+                  setWeightUnit(unit);
+                }}
+              />
+            </View>
+          </View>
           {settingsQuery.data?.vesyncConnected && (
             <AppButton
               title={pullFromScaleMutation.isPending ? 'Reading scale…' : 'Pull from Scale'}
@@ -320,6 +352,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm + 2,
     fontSize: 20,
     color: colors.textPrimary,
+  },
+  weightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  weightInput: {
+    flex: 1,
+  },
+  unitPicker: {
+    width: 150,
   },
   previewBox: {
     gap: spacing.sm,

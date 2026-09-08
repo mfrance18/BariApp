@@ -40,3 +40,9 @@ export function servingToGrams(amount: number, unit: string): number | null {
   const perUnit = gramsPerUnit(unit);
   return perUnit == null ? null : amount * perUnit;
 }
+
+/** Converts `grams` into an amount of `unit`, or null if the unit isn't weighable. */
+export function gramsToServing(grams: number, unit: string): number | null {
+  const perUnit = gramsPerUnit(unit);
+  return perUnit == null ? null : grams / perUnit;
+}
