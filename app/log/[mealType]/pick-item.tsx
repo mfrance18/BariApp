@@ -35,8 +35,8 @@ export default function PickItemScreen() {
     enabled: tab === 'recipes',
   });
 
-  const showOffFallback = tab === 'foods' && !foodsQuery.isLoading && (foodsQuery.data?.length ?? 0) === 0;
-  const offSearch = useOffFoodSearch(query, showOffFallback);
+  const showOffSearch = tab === 'foods' && query.trim().length > 1;
+  const offSearch = useOffFoodSearch(query, showOffSearch);
 
   useFocusEffect(
     useCallback(() => {
@@ -133,14 +133,21 @@ export default function PickItemScreen() {
           )}
           ListEmptyComponent={
             query.trim().length > 1 ? (
-              <OffFoodResults
-                results={offSearch.results}
-                loading={offSearch.loading}
-                context={{ destination: '/food/new', logMealType: mealType, logDate: effectiveLogDate }}
-              />
+              <Text style={styles.emptyText}>No matches in your library.</Text>
             ) : (
               <Text style={styles.emptyText}>No foods found. Add one above.</Text>
             )
+          }
+          ListFooterComponent={
+            showOffSearch ? (
+              <View style={styles.offSection}>
+                <OffFoodResults
+                  results={offSearch.results}
+                  loading={offSearch.loading}
+                  context={{ destination: '/food/new', logMealType: mealType, logDate: effectiveLogDate }}
+                />
+              </View>
+            ) : null
           }
         />
       ) : (
@@ -235,5 +242,8 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
+  },
+  offSection: {
+    marginTop: spacing.md,
   },
 });

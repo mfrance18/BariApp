@@ -31,9 +31,8 @@ export default function LibraryScreen() {
     enabled: activeTab === 'recipes',
   });
 
-  const showOffFallback =
-    activeTab === 'foods' && !foodsQuery.isLoading && !foodsQuery.isError && (foodsQuery.data?.length ?? 0) === 0;
-  const offSearch = useOffFoodSearch(query, showOffFallback);
+  const showOffSearch = activeTab === 'foods' && query.trim().length > 1;
+  const offSearch = useOffFoodSearch(query, showOffSearch);
 
   useFocusEffect(
     useCallback(() => {
@@ -114,10 +113,17 @@ export default function LibraryScreen() {
             foodsQuery.isError ? (
               <Text style={styles.emptyText}>Couldn't load foods: {(foodsQuery.error as Error).message}</Text>
             ) : query.trim().length > 1 ? (
-              <OffFoodResults results={offSearch.results} loading={offSearch.loading} context={{ destination: '/food/new' }} />
+              <Text style={styles.emptyText}>No matches in your library.</Text>
             ) : (
               <Text style={styles.emptyText}>No foods yet.</Text>
             )
+          }
+          ListFooterComponent={
+            showOffSearch ? (
+              <View style={styles.offSection}>
+                <OffFoodResults results={offSearch.results} loading={offSearch.loading} context={{ destination: '/food/new' }} />
+              </View>
+            ) : null
           }
         />
       ) : (
@@ -212,5 +218,8 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
+  },
+  offSection: {
+    marginTop: spacing.md,
   },
 });

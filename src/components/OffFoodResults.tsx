@@ -10,7 +10,7 @@ interface OffFoodResultsProps {
   context: FoodMatchContext;
 }
 
-/** Shown when a food search comes up empty locally: lets the user pick a match from Open Food Facts instead. */
+/** Lets the user search Open Food Facts and pick a match, alongside whatever's already in the local library. */
 export function OffFoodResults({ results, loading, context }: OffFoodResultsProps) {
   async function handlePress(product: OffProduct) {
     const handledExisting = await navigateToExistingFoodByBarcode(product.code, context);
@@ -21,19 +21,27 @@ export function OffFoodResults({ results, loading, context }: OffFoodResultsProp
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.primary} />
+      <View style={styles.container}>
+        <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
       </View>
     );
   }
 
   if (results.length === 0) {
-    return <Text style={styles.emptyText}>Not in your library, and no matches on Open Food Facts.</Text>;
+    return (
+      <View style={styles.container}>
+        <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
+        <Text style={styles.emptyText}>No matches on Open Food Facts.</Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>NOT IN YOUR LIBRARY — FROM OPEN FOOD FACTS</Text>
+      <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
       {results.map((product) => (
         <TouchableOpacity key={product.code} style={styles.row} onPress={() => handlePress(product)}>
           <View style={styles.rowTextGroup}>
@@ -87,6 +95,6 @@ const styles = StyleSheet.create({
   emptyText: {
     color: colors.textMuted,
     textAlign: 'center',
-    marginTop: 24,
+    paddingVertical: spacing.sm,
   },
 });
