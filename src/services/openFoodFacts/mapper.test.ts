@@ -52,4 +52,55 @@ describe('mapOffProductToFood', () => {
     expect(food.proteinG).toBe(0);
     expect(food.sodiumMg).toBe(0);
   });
+
+  it('uses OFF-provided per-serving nutrients and a label-matching serving size when available', () => {
+    const product: OffProduct = {
+      code: '333',
+      product_name: 'Gatorade Zero',
+      brands: 'Gatorade',
+      serving_size: '1 bottle (591ml)',
+      serving_quantity: 591,
+      nutriments: {
+        'energy-kcal_100g': 0,
+        'energy-kcal_serving': 0,
+        proteins_serving: 0,
+        carbohydrates_serving: 0,
+        fat_serving: 0,
+        fiber_serving: 0,
+        sugars_serving: 0,
+        sodium_serving: 0.27,
+      },
+    };
+
+    const food = mapOffProductToFood(product, '333');
+    expect(food.servingAmount).toBe(1);
+    expect(food.servingUnit).toBe('bottle');
+    expect(food.calories).toBe(0);
+    expect(food.sodiumMg).toBeCloseTo(270);
+  });
+
+  it('scales per-100g values to the serving size when OFF has no per-serving nutrients', () => {
+    const product: OffProduct = {
+      code: '444',
+      product_name: 'Orange Juice',
+      serving_size: '8 fl oz (240ml)',
+      serving_quantity: 240,
+      nutriments: {
+        'energy-kcal_100g': 45,
+        proteins_100g: 0.7,
+        carbohydrates_100g: 10,
+        fat_100g: 0.2,
+        fiber_100g: 0.2,
+        sugars_100g: 8,
+        sodium_100g: 0.001,
+      },
+    };
+
+    const food = mapOffProductToFood(product, '444');
+    expect(food.servingAmount).toBe(8);
+    expect(food.servingUnit).toBe('fl oz');
+    expect(food.calories).toBeCloseTo(108);
+    expect(food.carbsG).toBeCloseTo(24);
+    expect(food.sodiumMg).toBeCloseTo(2);
+  });
 });
