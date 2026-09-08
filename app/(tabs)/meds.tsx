@@ -9,7 +9,7 @@ import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } fr
 import { isNotificationsSupported } from '../../src/services/notifications/environment';
 import { ensureNotificationPermission } from '../../src/services/notifications/permissions';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { todayLogDateKey } from '../../src/utils/date';
+import { formatTimeOfDay, todayLogDateKey } from '../../src/utils/date';
 
 export default function MedsScreen() {
   const queryClient = useQueryClient();
@@ -67,7 +67,7 @@ export default function MedsScreen() {
             <Text style={styles.rowName}>{item.name}</Text>
             <Text style={styles.rowMeta}>
               {item.dosageLabel ? `${item.dosageLabel} · ` : ''}
-              {formatTime(item.timeOfDay)}
+              {formatTimeOfDay(item.timeOfDay)}
             </Text>
           </View>
           {item.status === 'taken' ? (
@@ -82,14 +82,6 @@ export default function MedsScreen() {
       }
     />
   );
-}
-
-function formatTime(timeOfDay: string): string {
-  const [hourStr, minuteStr] = timeOfDay.split(':');
-  const hour = Number(hourStr);
-  const suffix = hour >= 12 ? 'PM' : 'AM';
-  const displayHour = hour % 12 === 0 ? 12 : hour % 12;
-  return `${displayHour}:${minuteStr} ${suffix}`;
 }
 
 const styles = StyleSheet.create({

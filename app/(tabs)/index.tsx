@@ -9,11 +9,12 @@ import { ProgressRing } from '../../src/components/ui/ProgressRing';
 import { SwipeToDelete } from '../../src/components/ui/SwipeToDelete';
 import { listEntriesForDate as listFluidEntriesForDate } from '../../src/db/repositories/fluidRepo';
 import { deleteEntry, listEntriesForDate, type MealLogEntryWithName } from '../../src/db/repositories/mealLogRepo';
+import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } from '../../src/db/repositories/medsRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { formatDisplayDate, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
+import { formatDisplayDate, formatTimeOfDay, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz } from '../../src/utils/units';
 
 const KG_TO_LB = 2.20462;
@@ -57,6 +58,17 @@ export default function DashboardScreen() {
   const { data: fluidEntries } = useQuery({
     queryKey: ['fluidLog', logDate],
     queryFn: () => listFluidEntriesForDate(logDate),
+  });
+
+  const { data: medsChecklist } = useQuery({
+    queryKey: ['medsChecklist', logDate],
+    queryFn: () => getTodayChecklist(logDate, new Date(`${logDate}T00:00:00`)),
+  });
+
+  const toggleMedMutation = useMutation({
+    mutationFn: (item: TodayChecklistItem) =>
+      item.status === 'taken' ? clearStatus(item.scheduleId, logDate) : setStatus(item.scheduleId, logDate, 'taken'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['medsChecklist', logDate] }),
   });
 
   const grouped = groupEntriesByMeal(entries ?? []);
@@ -163,6 +175,44 @@ export default function DashboardScreen() {
               </Card>
             </TouchableOpacity>
           </View>
+
+          {medsChecklist && medsChecklist.length > 0 && (
+            <Card style={styles.medsCard}>
+              <View style={styles.medsHeaderRow}>
+                <Text style={styles.mealsHeading}>Vitamins &amp; Meds</Text>
+                <TouchableOpacity onPress={() => router.push('/meds/manage')} hitSlop={8}>
+                  <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+              {medsChecklist.map((item) => (
+                <TouchableOpacity
+                  key={item.scheduleId}
+                  style={[styles.medRow, item.status === 'taken' && styles.medRowTaken]}
+                  onPress={() => toggleMedMutation.mutate(item)}
+                >
+                  <View style={styles.medRowIcon}>
+                    <Ionicons
+                      name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
+                      size={18}
+                      color={item.status === 'taken' ? colors.success : colors.primary}
+                    />
+                  </View>
+                  <View style={styles.medTextGroup}>
+                    <Text style={styles.medName}>{item.name}</Text>
+                    <Text style={styles.medMeta}>
+                      {item.dosageLabel ? `${item.dosageLabel} · ` : ''}
+                      {formatTimeOfDay(item.timeOfDay)}
+                    </Text>
+                  </View>
+                  {item.status === 'taken' ? (
+                    <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+                  ) : (
+                    <View style={styles.medCheckCircle} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </Card>
+          )}
 
           <Text style={styles.mealsHeading}>Meals</Text>
         </View>
@@ -438,6 +488,53 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     marginLeft: spacing.xs,
     textTransform: 'uppercase',
+  },
+  medsCard: {
+    gap: spacing.sm,
+  },
+  medsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  medRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  medRowTaken: {
+    backgroundColor: colors.successLight,
+  },
+  medRowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medTextGroup: {
+    flex: 1,
+  },
+  medName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  medMeta: {
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  medCheckCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: colors.border,
   },
   mealSection: {
     gap: spacing.sm,
