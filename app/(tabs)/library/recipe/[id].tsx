@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Button, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { RecipeForm, type ParsedRecipeValues, type RecipeFormValues } from '../../../../src/components/RecipeForm';
+import { AppButton } from '../../../../src/components/ui/AppButton';
 import {
   archiveRecipe,
   getRecipeWithIngredients,
   updateRecipe,
   type RecipeWithIngredients,
 } from '../../../../src/db/repositories/recipesRepo';
+import { colors } from '../../../../src/theme/theme';
 
 function recipeToFormValues(recipe: RecipeWithIngredients): RecipeFormValues {
   return {
@@ -65,7 +67,7 @@ export default function EditRecipeScreen() {
         onSubmit={(values) => updateMutation.mutate(values)}
       />
       <View style={styles.deleteRow}>
-        <Button title="Delete Recipe" color="#c00" onPress={() => archiveMutation.mutate()} />
+        <AppButton title="Delete Recipe" variant="danger" onPress={() => archiveMutation.mutate()} />
       </View>
     </View>
   );
@@ -74,11 +76,13 @@ export default function EditRecipeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   deleteRow: {
     padding: 16,

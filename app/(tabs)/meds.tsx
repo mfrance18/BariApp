@@ -1,11 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { Button, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { AppButton } from '../../src/components/ui/AppButton';
 import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } from '../../src/db/repositories/medsRepo';
 import { isNotificationsSupported } from '../../src/services/notifications/environment';
 import { ensureNotificationPermission } from '../../src/services/notifications/permissions';
+import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { todayLogDateKey } from '../../src/utils/date';
 
 export default function MedsScreen() {
@@ -39,11 +42,13 @@ export default function MedsScreen() {
         <View style={styles.header}>
           <Text style={styles.heading}>Today&apos;s Vitamins &amp; Meds</Text>
           {!isNotificationsSupported && (
-            <Text style={styles.noticeText}>
-              Reminders don&apos;t work in Expo Go — build a development build to get notifications.
-            </Text>
+            <View style={styles.noticeBox}>
+              <Text style={styles.noticeText}>
+                Reminders don&apos;t work in Expo Go — build a development build to get notifications.
+              </Text>
+            </View>
           )}
-          <Button title="Manage Vitamins & Meds" onPress={() => router.push('/meds/manage')} />
+          <AppButton title="Manage Vitamins & Meds" variant="secondary" onPress={() => router.push('/meds/manage')} />
         </View>
       }
       renderItem={({ item }) => (
@@ -51,14 +56,25 @@ export default function MedsScreen() {
           style={[styles.row, item.status === 'taken' && styles.rowTaken]}
           onPress={() => toggleMutation.mutate({ item })}
         >
-          <View>
+          <View style={styles.rowIcon}>
+            <Ionicons
+              name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
+              size={18}
+              color={item.status === 'taken' ? colors.success : colors.primary}
+            />
+          </View>
+          <View style={styles.rowTextGroup}>
             <Text style={styles.rowName}>{item.name}</Text>
             <Text style={styles.rowMeta}>
               {item.dosageLabel ? `${item.dosageLabel} · ` : ''}
               {formatTime(item.timeOfDay)}
             </Text>
           </View>
-          <Text style={styles.statusText}>{item.status === 'taken' ? '✓ Taken' : 'Mark Taken'}</Text>
+          {item.status === 'taken' ? (
+            <Ionicons name="checkmark-circle" size={24} color={colors.success} />
+          ) : (
+            <View style={styles.checkCircle} />
+          )}
         </TouchableOpacity>
       )}
       ListEmptyComponent={
@@ -79,55 +95,70 @@ function formatTime(timeOfDay: string): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    gap: 8,
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   header: {
-    gap: 12,
-    marginBottom: 8,
+    gap: spacing.md,
+    marginBottom: spacing.xs,
   },
   heading: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...typography.title,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    marginBottom: 8,
+    gap: spacing.sm,
+    backgroundColor: colors.card,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    marginBottom: spacing.sm,
   },
   rowTaken: {
-    backgroundColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
+    backgroundColor: colors.successLight,
+  },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTextGroup: {
+    flex: 1,
   },
   rowName: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    color: colors.textPrimary,
   },
   rowMeta: {
-    fontSize: 13,
-    color: '#777',
+    fontSize: 12,
+    color: colors.textMuted,
   },
-  statusText: {
-    color: '#2563eb',
-    fontWeight: '600',
+  checkCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.border,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
   },
+  noticeBox: {
+    backgroundColor: '#FEF6E7',
+    borderRadius: radius.md,
+    padding: spacing.sm,
+  },
   noticeText: {
     fontSize: 12,
-    color: '#a16207',
-    backgroundColor: '#fef9c3',
-    padding: 8,
-    borderRadius: 8,
+    color: '#8A5A00',
   },
 });

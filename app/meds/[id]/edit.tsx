@@ -1,8 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Button, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { AppButton } from '../../../src/components/ui/AppButton';
+import { Card } from '../../../src/components/ui/Card';
+import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import {
   archiveVitaminMed,
   createSchedule,
@@ -15,6 +18,7 @@ import {
 } from '../../../src/db/repositories/medsRepo';
 import { ensureNotificationPermission } from '../../../src/services/notifications/permissions';
 import { rescheduleAll } from '../../../src/services/notifications/scheduler';
+import { colors, radius, spacing, typography } from '../../../src/theme/theme';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -167,20 +171,26 @@ export default function EditVitaminMedScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Field label="Name" value={name} onChangeText={setName} />
+      <Card style={styles.card}>
+        <Field label="Name" value={name} onChangeText={setName} />
 
-      <Text style={styles.sectionLabel}>Type</Text>
-      <View style={styles.segmentRow}>
-        <SegmentButton label="Vitamin" active={type === 'vitamin'} onPress={() => setType('vitamin')} />
-        <SegmentButton label="Medication" active={type === 'medication'} onPress={() => setType('medication')} />
-      </View>
+        <Text style={styles.sectionLabel}>TYPE</Text>
+        <SegmentedControl
+          options={[
+            { label: 'Vitamin', value: 'vitamin' },
+            { label: 'Medication', value: 'medication' },
+          ]}
+          value={type}
+          onChange={setType}
+        />
 
-      <Field label="Dosage (e.g. 500mg)" value={dosageLabel} onChangeText={setDosageLabel} />
-      <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
+        <Field label="Dosage (e.g. 500mg)" value={dosageLabel} onChangeText={setDosageLabel} />
+        <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
+      </Card>
 
-      <Text style={styles.sectionLabel}>Reminder Times</Text>
+      <Text style={styles.sectionLabel}>REMINDER TIMES</Text>
       {schedules.map((schedule, index) => (
-        <View key={index} style={styles.scheduleCard}>
+        <Card key={index} style={styles.scheduleCard}>
           <View style={styles.timeRow}>
             <TextInput
               style={styles.timeInput}
@@ -197,9 +207,9 @@ export default function EditVitaminMedScreen() {
               keyboardType="number-pad"
               maxLength={2}
             />
-            <Text style={styles.removeLink} onPress={() => removeScheduleDraft(index)}>
-              Remove
-            </Text>
+            <TouchableOpacity style={styles.removeButton} onPress={() => removeScheduleDraft(index)} hitSlop={8}>
+              <Text style={styles.removeLink}>Remove</Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.daysRow}>
             {DAY_LABELS.map((label, day) => (
@@ -214,13 +224,17 @@ export default function EditVitaminMedScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
+        </Card>
       ))}
-      <Button title="+ Add Time" onPress={() => setSchedules((prev) => [...prev, newScheduleDraft()])} />
+      <AppButton
+        title="+ Add Time"
+        variant="secondary"
+        onPress={() => setSchedules((prev) => [...prev, newScheduleDraft()])}
+      />
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
-      <Button
+      <AppButton
         title={saveMutation.isPending ? 'Saving…' : 'Save'}
         onPress={() => saveMutation.mutate()}
         disabled={saveMutation.isPending}
@@ -228,7 +242,7 @@ export default function EditVitaminMedScreen() {
 
       {!isNew && (
         <View style={styles.deleteRow}>
-          <Button title="Archive" color="#c00" onPress={() => archiveMutation.mutate()} />
+          <AppButton title="Archive" variant="danger" onPress={() => archiveMutation.mutate()} />
         </View>
       )}
     </ScrollView>
@@ -254,80 +268,57 @@ function Field({
         value={value}
         onChangeText={onChangeText}
         multiline={multiline}
+        placeholderTextColor={colors.textMuted}
       />
     </View>
-  );
-}
-
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Text onPress={onPress} style={[styles.segmentButton, active && styles.segmentButtonActive]}>
-      {label}
-    </Text>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
     paddingBottom: 48,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
+  },
+  card: {
+    gap: spacing.md,
   },
   field: {
-    gap: 4,
+    gap: spacing.xs,
   },
   fieldLabel: {
     fontSize: 13,
-    color: '#555',
+    color: colors.textSecondary,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     fontSize: 15,
+    color: colors.textPrimary,
   },
   inputMultiline: {
     minHeight: 60,
     textAlignVertical: 'top',
   },
   sectionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 8,
-    color: '#333',
-  },
-  segmentRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  segmentButton: {
-    flex: 1,
-    textAlign: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#eee',
-    overflow: 'hidden',
-  },
-  segmentButtonActive: {
-    backgroundColor: '#dbeafe',
-    fontWeight: '700',
+    ...typography.label,
+    marginLeft: spacing.xs,
   },
   scheduleCard: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ddd',
-    borderRadius: 10,
-    padding: 10,
-    gap: 8,
+    gap: spacing.sm,
   },
   timeRow: {
     flexDirection: 'row',
@@ -337,19 +328,23 @@ const styles = StyleSheet.create({
   timeInput: {
     width: 48,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 6,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
     paddingHorizontal: 6,
     paddingVertical: 6,
     textAlign: 'center',
     fontSize: 16,
+    color: colors.textPrimary,
   },
   timeColon: {
     fontSize: 16,
+    color: colors.textPrimary,
+  },
+  removeButton: {
+    marginLeft: 'auto',
   },
   removeLink: {
-    marginLeft: 'auto',
-    color: '#c00',
+    color: colors.danger,
     fontSize: 13,
   },
   daysRow: {
@@ -359,25 +354,25 @@ const styles = StyleSheet.create({
   dayChip: {
     paddingHorizontal: 8,
     paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: '#eee',
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
   },
   dayChipActive: {
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
   },
   dayChipText: {
     fontSize: 12,
-    color: '#555',
+    color: colors.textSecondary,
   },
   dayChipTextActive: {
     color: '#fff',
     fontWeight: '600',
   },
   errorText: {
-    color: '#c00',
+    color: colors.danger,
     fontSize: 13,
   },
   deleteRow: {
-    marginTop: 8,
+    marginTop: spacing.sm,
   },
 });

@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AppButton } from '../../../src/components/ui/AppButton';
+import { Card } from '../../../src/components/ui/Card';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
 import { getSettings } from '../../../src/db/repositories/settingsRepo';
-import { getLatestWeight } from '../../../src/services/vesync/adapter';
 import {
   computeRecipeTotals,
   getReferenceWeightG,
@@ -18,7 +19,19 @@ import {
   type NutritionFields,
 } from '../../../src/services/nutrition/scaling';
 import type { MealType } from '../../../src/services/nutrition/totals';
+import { getLatestWeight } from '../../../src/services/vesync/adapter';
+import { colors, radius, spacing, typography } from '../../../src/theme/theme';
 import { todayLogDateKey } from '../../../src/utils/date';
+
+const NUTRIENT_COLORS: Record<string, string> = {
+  Calories: colors.primary,
+  Protein: colors.protein,
+  Carbs: colors.carbs,
+  Fat: colors.fat,
+  Fiber: colors.fiber,
+  Sugar: colors.carbs,
+  Sodium: colors.sodium,
+};
 
 export default function WeighScreen() {
   const { mealType, itemType, itemId, logDate, entryId } = useLocalSearchParams<{
@@ -165,12 +178,12 @@ export default function WeighScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.itemName}>{itemName}</Text>
       <Text style={styles.mealLabel}>Logging to {mealType}</Text>
 
       {isServingBased ? (
-        <View style={styles.field}>
+        <Card style={styles.field}>
           <Text style={styles.fieldLabel}>
             Servings {foodQuery.data?.servingLabel ? `(1 = ${foodQuery.data.servingLabel})` : ''}
           </Text>
@@ -183,9 +196,9 @@ export default function WeighScreen() {
             autoFocus
             selectTextOnFocus
           />
-        </View>
+        </Card>
       ) : (
-        <View style={styles.field}>
+        <Card style={styles.field}>
           <Text style={styles.fieldLabel}>Weight (g)</Text>
           <TextInput
             style={styles.input}
@@ -196,21 +209,24 @@ export default function WeighScreen() {
             }}
             keyboardType="decimal-pad"
             placeholder="e.g. 120"
+            placeholderTextColor={colors.textMuted}
             autoFocus
           />
           {settingsQuery.data?.vesyncConnected && (
-            <Button
+            <AppButton
               title={pullFromScaleMutation.isPending ? 'Reading scale…' : 'Pull from Scale'}
+              variant="secondary"
               onPress={() => pullFromScaleMutation.mutate()}
               disabled={pullFromScaleMutation.isPending}
             />
           )}
           {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
           {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
-        </View>
+        </Card>
       )}
 
-      <View style={styles.previewBox}>
+      <Card style={styles.previewBox}>
+        <Text style={styles.previewHeading}>NUTRITION</Text>
         <NutritionRow label="Calories" value={(preview ?? ZERO_NUTRITION).calories} unit="kcal" />
         <NutritionRow label="Protein" value={(preview ?? ZERO_NUTRITION).proteinG} unit="g" />
         <NutritionRow label="Carbs" value={(preview ?? ZERO_NUTRITION).carbsG} unit="g" />
@@ -218,23 +234,26 @@ export default function WeighScreen() {
         <NutritionRow label="Fiber" value={(preview ?? ZERO_NUTRITION).fiberG} unit="g" />
         <NutritionRow label="Sugar" value={(preview ?? ZERO_NUTRITION).sugarG} unit="g" />
         <NutritionRow label="Sodium" value={(preview ?? ZERO_NUTRITION).sodiumMg} unit="mg" />
-      </View>
+      </Card>
 
       {mutation.error && <Text style={styles.errorText}>{(mutation.error as Error).message}</Text>}
 
-      <Button
+      <AppButton
         title={mutation.isPending ? 'Saving…' : isEditing ? 'Save Changes' : 'Log It'}
         onPress={() => mutation.mutate()}
         disabled={mutation.isPending || !preview}
       />
-    </View>
+    </ScrollView>
   );
 }
 
 function NutritionRow({ label, value, unit }: { label: string; value: number; unit: string }) {
   return (
     <View style={styles.nutritionRow}>
-      <Text style={styles.nutritionLabel}>{label}</Text>
+      <View style={styles.nutritionLabelRow}>
+        <View style={[styles.nutritionDot, { backgroundColor: NUTRIENT_COLORS[label] ?? colors.textMuted }]} />
+        <Text style={styles.nutritionLabel}>{label}</Text>
+      </View>
       <Text style={styles.nutritionValue}>
         {value} {unit}
       </Text>
@@ -245,59 +264,77 @@ function NutritionRow({ label, value, unit }: { label: string; value: number; un
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    gap: 16,
+    backgroundColor: colors.background,
+  },
+  content: {
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   itemName: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...typography.title,
   },
   mealLabel: {
-    color: '#777',
-    marginTop: -12,
+    ...typography.caption,
+    marginTop: -spacing.sm,
+    textTransform: 'capitalize',
   },
   field: {
-    gap: 4,
+    gap: spacing.sm,
   },
   fieldLabel: {
     fontSize: 13,
-    color: '#555',
+    color: colors.textSecondary,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
     fontSize: 20,
+    color: colors.textPrimary,
   },
   previewBox: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 12,
-    gap: 6,
+    gap: spacing.sm,
+  },
+  previewHeading: {
+    ...typography.label,
+    marginBottom: spacing.xs,
   },
   nutritionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  nutritionLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  nutritionDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   nutritionLabel: {
-    color: '#444',
+    color: colors.textPrimary,
   },
   nutritionValue: {
     fontWeight: '600',
+    color: colors.textPrimary,
   },
   errorText: {
-    color: '#c00',
+    color: colors.danger,
     fontSize: 13,
   },
   helperText: {
-    color: '#2563eb',
+    color: colors.primary,
     fontSize: 13,
   },
 });

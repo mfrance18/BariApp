@@ -9,6 +9,7 @@ import { db } from '../src/db/client';
 import migrations from '../src/db/migrations/migrations';
 import { ensureSettingsSeeded } from '../src/db/repositories/settingsRepo';
 import { rescheduleAll } from '../src/services/notifications/scheduler';
+import { colors } from '../src/theme/theme';
 
 const queryClient = new QueryClient();
 
@@ -53,7 +54,16 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
-        <Stack screenOptions={{ headerShown: false }}>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            headerStyle: { backgroundColor: colors.card },
+            headerTitleStyle: { color: colors.textPrimary, fontWeight: '700' },
+            headerTintColor: colors.primary,
+            headerShadowVisible: false,
+            contentStyle: { backgroundColor: colors.background },
+          }}
+        >
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="log/[mealType]/pick-item" options={{ presentation: 'modal', headerShown: true, title: 'Add Item' }} />
           <Stack.Screen name="log/[mealType]/weigh" options={{ presentation: 'modal', headerShown: true, title: 'Weigh It' }} />

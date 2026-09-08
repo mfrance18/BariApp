@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Button, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { AppButton } from '../../../../src/components/ui/AppButton';
 import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../../../src/components/FoodForm';
 import { archiveFood, getFoodById, updateFood, type Food } from '../../../../src/db/repositories/foodsRepo';
+import { colors } from '../../../../src/theme/theme';
 import { mlToOz } from '../../../../src/utils/units';
 
 function foodToFormValues(food: Food): FoodFormValues {
@@ -73,7 +75,7 @@ export default function EditFoodScreen() {
         onSubmit={(values) => updateMutation.mutate(values)}
       />
       <View style={styles.deleteRow}>
-        <Button title="Delete Food" color="#c00" onPress={() => archiveMutation.mutate()} />
+        <AppButton title="Delete Food" variant="danger" onPress={() => archiveMutation.mutate()} />
       </View>
     </View>
   );
@@ -82,11 +84,13 @@ export default function EditFoodScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   center: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background,
   },
   deleteRow: {
     padding: 16,

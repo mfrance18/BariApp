@@ -1,11 +1,13 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Button, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { mapOffProductToFood } from '../src/services/openFoodFacts/mapper';
-import { getProductByBarcode } from '../src/services/openFoodFacts/client';
+import { AppButton } from '../src/components/ui/AppButton';
 import { getFoodByBarcode } from '../src/db/repositories/foodsRepo';
+import { getProductByBarcode } from '../src/services/openFoodFacts/client';
+import { mapOffProductToFood } from '../src/services/openFoodFacts/mapper';
+import { colors, radius, spacing } from '../src/theme/theme';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
 
@@ -79,7 +81,7 @@ export default function ScanBarcodeScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.message}>BariApp needs camera access to scan barcodes.</Text>
-        <Button title="Grant Camera Access" onPress={requestPermission} />
+        <AppButton title="Grant Camera Access" onPress={requestPermission} />
       </View>
     );
   }
@@ -122,12 +124,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 12,
+    padding: spacing.xl,
+    gap: spacing.md,
+    backgroundColor: colors.background,
   },
   message: {
     textAlign: 'center',
     fontSize: 15,
+    color: colors.textPrimary,
   },
   scanFrameContainer: {
     position: 'absolute',

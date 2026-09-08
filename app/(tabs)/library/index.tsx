@@ -1,10 +1,14 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { AppButton } from '../../../src/components/ui/AppButton';
+import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { listFoods } from '../../../src/db/repositories/foodsRepo';
 import { listRecipes } from '../../../src/db/repositories/recipesRepo';
+import { colors, radius, spacing } from '../../../src/theme/theme';
 
 type LibraryTab = 'foods' | 'recipes';
 
@@ -26,29 +30,44 @@ export default function LibraryScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.segmentRow}>
-        <SegmentButton label="Foods" active={activeTab === 'foods'} onPress={() => setActiveTab('foods')} />
-        <SegmentButton label="Recipes" active={activeTab === 'recipes'} onPress={() => setActiveTab('recipes')} />
-      </View>
-
-      <TextInput
-        style={styles.searchInput}
-        placeholder={`Search ${activeTab}…`}
-        value={query}
-        onChangeText={setQuery}
+      <SegmentedControl
+        options={[
+          { label: 'Foods', value: 'foods' },
+          { label: 'Recipes', value: 'recipes' },
+        ]}
+        value={activeTab}
+        onChange={setActiveTab}
       />
+
+      <View style={styles.searchRow}>
+        <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder={`Search ${activeTab}…`}
+          placeholderTextColor={colors.textMuted}
+          value={query}
+          onChangeText={setQuery}
+        />
+      </View>
 
       <View style={styles.actionsRow}>
         {activeTab === 'foods' ? (
           <>
-            <Button title="+ New Food" onPress={() => router.push('/library/food/new')} />
-            <Button
+            <AppButton
+              title="+ New Food"
+              variant="secondary"
+              style={styles.actionButton}
+              onPress={() => router.push('/library/food/new')}
+            />
+            <AppButton
               title="Scan Barcode"
+              variant="secondary"
+              style={styles.actionButton}
               onPress={() => router.push({ pathname: '/scan-barcode', params: { returnTo: '/library/food/new' } })}
             />
           </>
         ) : (
-          <Button title="+ New Recipe" onPress={() => router.push('/library/recipe/new')} />
+          <AppButton title="+ New Recipe" variant="secondary" onPress={() => router.push('/library/recipe/new')} />
         )}
       </View>
 
@@ -58,10 +77,16 @@ export default function LibraryScreen() {
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => router.push(`/library/food/${item.id}`)}>
-              <Text style={styles.rowTitle}>{item.name}</Text>
-              <Text style={styles.rowSubtitle}>
-                {item.calories} kcal / {item.basisType === 'per_100g' ? '100g' : item.servingLabel ?? 'serving'}
-              </Text>
+              <View style={styles.rowIcon}>
+                <Ionicons name="fast-food-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.rowTextGroup}>
+                <Text style={styles.rowTitle}>{item.name}</Text>
+                <Text style={styles.rowSubtitle}>
+                  {item.calories} kcal / {item.basisType === 'per_100g' ? '100g' : item.servingLabel ?? 'serving'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
           ListEmptyComponent={<Text style={styles.emptyText}>No foods yet.</Text>}
@@ -72,10 +97,16 @@ export default function LibraryScreen() {
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
             <TouchableOpacity style={styles.row} onPress={() => router.push(`/library/recipe/${item.id}`)}>
-              <Text style={styles.rowTitle}>{item.name}</Text>
-              <Text style={styles.rowSubtitle}>
-                {item.cachedCaloriesPerServing} kcal/serving · {item.servings} servings
-              </Text>
+              <View style={styles.rowIcon}>
+                <Ionicons name="restaurant-outline" size={18} color={colors.primary} />
+              </View>
+              <View style={styles.rowTextGroup}>
+                <Text style={styles.rowTitle}>{item.name}</Text>
+                <Text style={styles.rowSubtitle}>
+                  {item.cachedCaloriesPerServing} kcal/serving · {item.servings} servings
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
             </TouchableOpacity>
           )}
           ListEmptyComponent={<Text style={styles.emptyText}>No recipes yet.</Text>}
@@ -85,62 +116,69 @@ export default function LibraryScreen() {
   );
 }
 
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Text onPress={onPress} style={[styles.segmentButton, active && styles.segmentButtonActive]}>
-      {label}
-    </Text>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
+    backgroundColor: colors.background,
   },
-  segmentRow: {
+  searchRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
-  segmentButton: {
-    flex: 1,
-    textAlign: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#eee',
-    overflow: 'hidden',
-  },
-  segmentButtonActive: {
-    backgroundColor: '#dbeafe',
-    fontWeight: '700',
+  searchIcon: {
+    marginRight: spacing.sm,
   },
   searchInput: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    color: colors.textPrimary,
   },
   actionsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
   },
   row: {
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    marginBottom: spacing.sm,
+  },
+  rowIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTextGroup: {
+    flex: 1,
   },
   rowTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
+    color: colors.textPrimary,
   },
   rowSubtitle: {
-    fontSize: 13,
-    color: '#777',
+    fontSize: 12,
+    color: colors.textMuted,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
   },

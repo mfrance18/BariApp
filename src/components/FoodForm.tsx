@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { roundNutritionForDisplay } from '../services/nutrition/scaling';
+import { colors, radius, spacing, typography } from '../theme/theme';
 import { ozToMl } from '../utils/units';
+import { AppButton } from './ui/AppButton';
+import { Card } from './ui/Card';
+import { SegmentedControl } from './ui/SegmentedControl';
 
 export interface FoodFormValues {
   name: string;
@@ -145,86 +149,90 @@ export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onS
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {onScanBarcode && <Button title="Scan Barcode" onPress={onScanBarcode} />}
+      {onScanBarcode && <AppButton title="Scan Barcode" variant="secondary" onPress={onScanBarcode} />}
 
-      <Field label="Name" value={values.name} onChangeText={(v) => set('name', v)} />
-      <Field label="Brand" value={values.brand} onChangeText={(v) => set('brand', v)} />
-      <Field
-        label="Barcode"
-        value={values.barcode}
-        onChangeText={(v) => set('barcode', v)}
-        keyboardType="number-pad"
-      />
-
-      <Text style={styles.sectionLabel}>Nutrition basis</Text>
-      <View style={styles.segmentRow}>
-        <SegmentButton
-          label="Per 100g"
-          active={values.basisType === 'per_100g'}
-          onPress={() => set('basisType', 'per_100g')}
+      <Card style={styles.card}>
+        <Field label="Name" value={values.name} onChangeText={(v) => set('name', v)} />
+        <Field label="Brand" value={values.brand} onChangeText={(v) => set('brand', v)} />
+        <Field
+          label="Barcode"
+          value={values.barcode}
+          onChangeText={(v) => set('barcode', v)}
+          keyboardType="number-pad"
         />
-        <SegmentButton
-          label="Per serving"
-          active={values.basisType === 'per_serving'}
-          onPress={() => set('basisType', 'per_serving')}
-        />
-      </View>
+      </Card>
 
-      {values.basisType === 'per_serving' && (
-        <>
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Serving size</Text>
-            <View style={styles.servingSizeRow}>
-              <TextInput
-                style={[styles.input, styles.servingSizeInput]}
-                value={values.servingSize}
-                onChangeText={(v) => set('servingSize', v)}
-                keyboardType="decimal-pad"
-              />
-              <View style={styles.unitSegmentRow}>
-                <UnitButton label="g" active={values.servingSizeUnit === 'g'} onPress={() => set('servingSizeUnit', 'g')} />
-                <UnitButton
-                  label="oz"
-                  active={values.servingSizeUnit === 'oz'}
-                  onPress={() => set('servingSizeUnit', 'oz')}
+      <Card style={styles.card}>
+        <Text style={styles.sectionLabel}>NUTRITION BASIS</Text>
+        <SegmentedControl
+          options={[
+            { label: 'Per 100g', value: 'per_100g' },
+            { label: 'Per serving', value: 'per_serving' },
+          ]}
+          value={values.basisType}
+          onChange={(v) => set('basisType', v)}
+        />
+
+        {values.basisType === 'per_serving' && (
+          <>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Serving size</Text>
+              <View style={styles.servingSizeRow}>
+                <TextInput
+                  style={[styles.input, styles.servingSizeInput]}
+                  value={values.servingSize}
+                  onChangeText={(v) => set('servingSize', v)}
+                  keyboardType="decimal-pad"
                 />
+                <View style={styles.unitSegmentRow}>
+                  <UnitButton label="g" active={values.servingSizeUnit === 'g'} onPress={() => set('servingSizeUnit', 'g')} />
+                  <UnitButton
+                    label="oz"
+                    active={values.servingSizeUnit === 'oz'}
+                    onPress={() => set('servingSizeUnit', 'oz')}
+                  />
+                </View>
               </View>
             </View>
+            <Field
+              label="Serving label (e.g. 1 bottle)"
+              value={values.servingLabel}
+              onChangeText={(v) => set('servingLabel', v)}
+            />
+          </>
+        )}
+      </Card>
+
+      <Card style={styles.card}>
+        <Text style={styles.sectionLabel}>
+          NUTRITION ({values.basisType === 'per_100g' ? 'PER 100G' : 'PER SERVING'})
+        </Text>
+        <Field label="Calories" value={values.calories} onChangeText={(v) => set('calories', v)} keyboardType="decimal-pad" />
+        <Field label="Protein (g)" value={values.proteinG} onChangeText={(v) => set('proteinG', v)} keyboardType="decimal-pad" />
+        <Field label="Carbs (g)" value={values.carbsG} onChangeText={(v) => set('carbsG', v)} keyboardType="decimal-pad" />
+        <Field label="Fat (g)" value={values.fatG} onChangeText={(v) => set('fatG', v)} keyboardType="decimal-pad" />
+        <Field label="Fiber (g)" value={values.fiberG} onChangeText={(v) => set('fiberG', v)} keyboardType="decimal-pad" />
+        <Field label="Sugar (g)" value={values.sugarG} onChangeText={(v) => set('sugarG', v)} keyboardType="decimal-pad" />
+        <Field label="Sodium (mg)" value={values.sodiumMg} onChangeText={(v) => set('sodiumMg', v)} keyboardType="decimal-pad" />
+
+        {values.basisType === 'per_serving' && (
+          <View style={styles.scaleHelper}>
+            <AppButton title="Scale values above from per-100g to this serving" variant="secondary" onPress={scaleValuesToServing} />
+            <Text style={styles.helperCaption}>
+              If the numbers above are currently per 100g, this multiplies them by the serving size to fill in
+              per-serving values instead.
+            </Text>
           </View>
-          <Field
-            label="Serving label (e.g. 1 bottle)"
-            value={values.servingLabel}
-            onChangeText={(v) => set('servingLabel', v)}
-          />
-        </>
-      )}
+        )}
+      </Card>
 
-      <Text style={styles.sectionLabel}>
-        Nutrition ({values.basisType === 'per_100g' ? 'per 100g' : 'per serving'})
-      </Text>
-      <Field label="Calories" value={values.calories} onChangeText={(v) => set('calories', v)} keyboardType="decimal-pad" />
-      <Field label="Protein (g)" value={values.proteinG} onChangeText={(v) => set('proteinG', v)} keyboardType="decimal-pad" />
-      <Field label="Carbs (g)" value={values.carbsG} onChangeText={(v) => set('carbsG', v)} keyboardType="decimal-pad" />
-      <Field label="Fat (g)" value={values.fatG} onChangeText={(v) => set('fatG', v)} keyboardType="decimal-pad" />
-      <Field label="Fiber (g)" value={values.fiberG} onChangeText={(v) => set('fiberG', v)} keyboardType="decimal-pad" />
-      <Field label="Sugar (g)" value={values.sugarG} onChangeText={(v) => set('sugarG', v)} keyboardType="decimal-pad" />
-      <Field label="Sodium (mg)" value={values.sodiumMg} onChangeText={(v) => set('sodiumMg', v)} keyboardType="decimal-pad" />
-
-      {values.basisType === 'per_serving' && (
-        <View style={styles.scaleHelper}>
-          <Button title="Scale values above from per-100g to this serving" onPress={scaleValuesToServing} />
-          <Text style={styles.helperCaption}>
-            If the numbers above are currently per 100g, this multiplies them by the serving size to fill in
-            per-serving values instead.
-          </Text>
-        </View>
-      )}
-
-      <Field label="Notes" value={values.notes} onChangeText={(v) => set('notes', v)} multiline />
+      <Card style={styles.card}>
+        <Field label="Notes" value={values.notes} onChangeText={(v) => set('notes', v)} multiline />
+      </Card>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
-      <Button title={submitting ? 'Saving…' : submitLabel} onPress={handleSubmit} disabled={submitting} />
+      <AppButton title={submitting ? 'Saving…' : submitLabel} onPress={handleSubmit} disabled={submitting} />
     </ScrollView>
   );
 }
@@ -251,22 +259,15 @@ function Field({
         onChangeText={onChangeText}
         keyboardType={keyboardType}
         multiline={multiline}
+        placeholderTextColor={colors.textMuted}
       />
     </View>
   );
 }
 
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <Text onPress={onPress} style={[styles.segmentButton, active && styles.segmentButtonActive]}>
-      {label}
-    </Text>
-  );
-}
-
 function UnitButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
-    <Text onPress={onPress} style={[styles.unitButton, active && styles.segmentButtonActive]}>
+    <Text onPress={onPress} style={[styles.unitButton, active && styles.unitButtonActive]}>
       {label}
     </Text>
   );
@@ -275,56 +276,42 @@ function UnitButton({ label, active, onPress }: { label: string; active: boolean
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
     paddingBottom: 48,
   },
+  card: {
+    gap: spacing.md,
+  },
   field: {
-    gap: 4,
+    gap: spacing.xs,
   },
   fieldLabel: {
     fontSize: 13,
-    color: '#555',
+    color: colors.textSecondary,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     fontSize: 15,
+    color: colors.textPrimary,
   },
   inputMultiline: {
     minHeight: 60,
     textAlignVertical: 'top',
   },
   sectionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 8,
-    color: '#333',
-  },
-  segmentRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  segmentButton: {
-    flex: 1,
-    textAlign: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#eee',
-    overflow: 'hidden',
-  },
-  segmentButtonActive: {
-    backgroundColor: '#dbeafe',
-    fontWeight: '700',
+    ...typography.label,
   },
   servingSizeRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
     alignItems: 'center',
   },
   servingSizeInput: {
@@ -338,19 +325,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#eee',
+    borderRadius: radius.sm,
+    backgroundColor: colors.background,
     overflow: 'hidden',
+    color: colors.textSecondary,
+    fontWeight: '600',
+  },
+  unitButtonActive: {
+    backgroundColor: colors.primaryLight,
+    color: colors.primary,
   },
   errorText: {
-    color: '#c00',
+    color: colors.danger,
     fontSize: 13,
   },
   scaleHelper: {
-    gap: 4,
+    gap: spacing.xs,
   },
   helperCaption: {
     fontSize: 12,
-    color: '#888',
+    color: colors.textMuted,
   },
 });

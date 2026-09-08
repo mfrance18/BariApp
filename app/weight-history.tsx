@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Button, Dimensions, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Dimensions, FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 
-import { addManualWeight, listWeightLog, type WeightLogEntry } from '../src/db/repositories/weightRepo';
+import { AppButton } from '../src/components/ui/AppButton';
+import { Card } from '../src/components/ui/Card';
 import { getSettings } from '../src/db/repositories/settingsRepo';
+import { addManualWeight, listWeightLog, type WeightLogEntry } from '../src/db/repositories/weightRepo';
 import { syncWeightHistoryToDb } from '../src/services/vesync/adapter';
+import { colors, radius, spacing } from '../src/theme/theme';
 
 const KG_TO_LB = 2.20462;
 
@@ -50,45 +53,51 @@ export default function WeightHistoryScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           {chronological.length > 1 && (
-            <LineChart
-              data={{
-                labels: chronological.map(() => ''),
-                datasets: [{ data: chronological.map((e) => toDisplayUnit(e.weightKg)) }],
-              }}
-              width={Dimensions.get('window').width - 32}
-              height={180}
-              yAxisSuffix={unit}
-              chartConfig={{
-                backgroundColor: '#fff',
-                backgroundGradientFrom: '#fff',
-                backgroundGradientTo: '#fff',
-                decimalPlaces: 1,
-                color: (opacity = 1) => `rgba(37, 99, 235, ${opacity})`,
-                labelColor: () => '#666',
-              }}
-              bezier
-              style={styles.chart}
-            />
+            <Card style={styles.chartCard}>
+              <LineChart
+                data={{
+                  labels: chronological.map(() => ''),
+                  datasets: [{ data: chronological.map((e) => toDisplayUnit(e.weightKg)) }],
+                }}
+                width={Dimensions.get('window').width - spacing.lg * 2 - spacing.lg * 2}
+                height={180}
+                yAxisSuffix={unit}
+                chartConfig={{
+                  backgroundColor: colors.card,
+                  backgroundGradientFrom: colors.card,
+                  backgroundGradientTo: colors.card,
+                  decimalPlaces: 1,
+                  color: (opacity = 1) => `rgba(11, 87, 208, ${opacity})`,
+                  labelColor: () => colors.textSecondary,
+                }}
+                bezier
+                style={styles.chart}
+              />
+            </Card>
           )}
 
-          <View style={styles.manualEntryRow}>
-            <TextInput
-              style={styles.input}
-              placeholder={`Weight (${unit})`}
-              keyboardType="decimal-pad"
-              value={manualWeight}
-              onChangeText={setManualWeight}
-            />
-            <Button title="Add" onPress={handleAddManual} disabled={addManualMutation.isPending} />
-          </View>
+          <Card style={styles.manualEntryCard}>
+            <View style={styles.manualEntryRow}>
+              <TextInput
+                style={styles.input}
+                placeholder={`Weight (${unit})`}
+                placeholderTextColor={colors.textMuted}
+                keyboardType="decimal-pad"
+                value={manualWeight}
+                onChangeText={setManualWeight}
+              />
+              <AppButton title="Add" onPress={handleAddManual} disabled={addManualMutation.isPending} />
+            </View>
 
-          {settings?.vesyncConnected && (
-            <Button
-              title={syncMutation.isPending ? 'Syncing…' : 'Sync from VeSync Scale'}
-              onPress={() => syncMutation.mutate()}
-              disabled={syncMutation.isPending}
-            />
-          )}
+            {settings?.vesyncConnected && (
+              <AppButton
+                title={syncMutation.isPending ? 'Syncing…' : 'Sync from VeSync Scale'}
+                variant="secondary"
+                onPress={() => syncMutation.mutate()}
+                disabled={syncMutation.isPending}
+              />
+            )}
+          </Card>
         </View>
       }
       renderItem={({ item }) => <WeightRow entry={item} unit={unit} toDisplayUnit={toDisplayUnit} />}
@@ -121,45 +130,56 @@ function WeightRow({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   header: {
-    gap: 12,
-    marginBottom: 8,
+    gap: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  chartCard: {
+    alignItems: 'center',
   },
   chart: {
-    borderRadius: 12,
+    borderRadius: radius.md,
+  },
+  manualEntryCard: {
+    gap: spacing.sm,
   },
   manualEntryRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
   },
   input: {
     flex: 1,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.textPrimary,
   },
   row: {
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    marginBottom: spacing.sm,
   },
   rowWeight: {
     fontSize: 16,
     fontWeight: '600',
+    color: colors.textPrimary,
   },
   rowMeta: {
     fontSize: 12,
-    color: '#888',
+    color: colors.textMuted,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
   },

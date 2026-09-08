@@ -1,13 +1,17 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { Card } from '../../src/components/ui/Card';
+import { ProgressRing } from '../../src/components/ui/ProgressRing';
 import { listEntriesForDate as listFluidEntriesForDate } from '../../src/db/repositories/fluidRepo';
 import { deleteEntry, listEntriesForDate, type MealLogEntryWithName } from '../../src/db/repositories/mealLogRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
+import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { formatDisplayDate, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz } from '../../src/utils/units';
 
@@ -18,6 +22,13 @@ const MEAL_LABELS: Record<MealType, string> = {
   lunch: 'Lunch',
   dinner: 'Dinner',
   snack: 'Snack',
+};
+
+const MEAL_ICONS: Record<MealType, keyof typeof Ionicons.glyphMap> = {
+  breakfast: 'sunny-outline',
+  lunch: 'restaurant-outline',
+  dinner: 'moon-outline',
+  snack: 'cafe-outline',
 };
 
 function addDays(dateKey: string, days: number): string {
@@ -52,6 +63,13 @@ export default function DashboardScreen() {
   const fluidGoalMl = settings?.dailyFluidGoalMl ?? 1500;
   const dailyTotals = sumEntries(entries ?? []);
 
+  const calorieGoal = settings?.dailyCalorieGoal ?? 0;
+  const caloriesRemaining = Math.round(calorieGoal - dailyTotals.calories);
+  const overGoal = calorieGoal > 0 && dailyTotals.calories > calorieGoal;
+  const ringProgress = calorieGoal > 0 ? dailyTotals.calories / calorieGoal : 0;
+  const proteinGoal = settings?.dailyProteinGoalG ?? 0;
+  const proteinProgress = proteinGoal > 0 ? Math.min(1, dailyTotals.proteinG / proteinGoal) : 0;
+
   return (
     <FlatList
       style={styles.container}
@@ -61,58 +79,91 @@ export default function DashboardScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <View style={styles.dateNavRow}>
-            <Text style={styles.navArrow} onPress={() => setLogDate((d) => addDays(d, -1))}>
-              ‹
-            </Text>
-            <Text style={styles.dateHeading}>{formatDisplayDate(logDate)}</Text>
-            <Text style={styles.navArrow} onPress={() => setLogDate((d) => addDays(d, 1))}>
-              ›
-            </Text>
-          </View>
-          <View style={styles.totalsBox}>
-            <Text style={styles.totalsText}>{Math.round(dailyTotals.calories)} kcal</Text>
-            <Text style={styles.totalsSubtext}>{Math.round(dailyTotals.proteinG)} g protein today</Text>
-            {settings && (
-              <View style={styles.goalsBox}>
-                <GoalProgress
-                  label="Calories"
-                  value={dailyTotals.calories}
-                  goal={settings.dailyCalorieGoal}
-                  unit="kcal"
-                  color="#f59e0b"
-                />
-                <GoalProgress
-                  label="Protein"
-                  value={dailyTotals.proteinG}
-                  goal={settings.dailyProteinGoalG}
-                  unit="g"
-                  color="#16a34a"
-                />
-              </View>
-            )}
-          </View>
-          <TouchableOpacity
-            style={styles.fluidStrip}
-            onPress={() => router.push('/fluids')}
-          >
-            <Text style={styles.fluidStripText}>
-              💧 {mlToOz(fluidTotalMl).toFixed(1)} / {mlToOz(fluidGoalMl).toFixed(1)} oz
-            </Text>
-          </TouchableOpacity>
-          {latestWeight && (
-            <TouchableOpacity style={styles.weightCard} onPress={() => router.push('/weight-history')}>
-              <Text style={styles.weightCardText}>
-                {(settings?.weightUnit === 'kg'
-                  ? latestWeight.weightKg
-                  : latestWeight.weightKg * KG_TO_LB
-                ).toFixed(1)}{' '}
-                {settings?.weightUnit ?? 'lb'}
-              </Text>
-              <Text style={styles.weightCardSubtext}>
-                as of {new Date(latestWeight.recordedAt).toLocaleDateString()} · View history
-              </Text>
+            <TouchableOpacity onPress={() => setLogDate((d) => addDays(d, -1))} hitSlop={12}>
+              <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
-          )}
+            <Text style={styles.dateHeading}>{formatDisplayDate(logDate)}</Text>
+            <TouchableOpacity onPress={() => setLogDate((d) => addDays(d, 1))} hitSlop={12}>
+              <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+
+          <Card style={styles.calorieCard}>
+            <ProgressRing
+              size={148}
+              strokeWidth={14}
+              progress={ringProgress}
+              color={overGoal ? colors.danger : colors.primary}
+              trackColor={colors.border}
+            >
+              <Text style={[styles.ringValue, overGoal && styles.ringValueDanger]}>
+                {Math.abs(caloriesRemaining)}
+              </Text>
+              <Text style={styles.ringLabel}>{overGoal ? 'kcal over' : 'kcal left'}</Text>
+            </ProgressRing>
+
+            <View style={styles.calorieStatsColumn}>
+              <CalorieStat label="Goal" value={Math.round(calorieGoal)} />
+              <CalorieStat label="Food" value={Math.round(dailyTotals.calories)} />
+              <CalorieStat label="Remaining" value={caloriesRemaining} highlight={overGoal} />
+            </View>
+          </Card>
+
+          <Card style={styles.macrosCard}>
+            <MacroBar
+              label="Protein"
+              value={dailyTotals.proteinG}
+              goal={proteinGoal}
+              progress={proteinProgress}
+              color={colors.protein}
+              unit="g"
+            />
+            <View style={styles.macroChipsRow}>
+              <MacroChip label="Carbs" value={dailyTotals.carbsG} unit="g" color={colors.carbs} />
+              <MacroChip label="Fat" value={dailyTotals.fatG} unit="g" color={colors.fat} />
+              <MacroChip label="Fiber" value={dailyTotals.fiberG} unit="g" color={colors.fiber} />
+              <MacroChip label="Sodium" value={dailyTotals.sodiumMg} unit="mg" color={colors.sodium} />
+            </View>
+          </Card>
+
+          <View style={styles.statCardsRow}>
+            <TouchableOpacity style={styles.statCardWrapper} onPress={() => router.push('/fluids')}>
+              <Card style={styles.statCard}>
+                <Ionicons name="water" size={20} color={colors.fluid} />
+                <Text style={styles.statCardValue}>
+                  {mlToOz(fluidTotalMl).toFixed(0)} <Text style={styles.statCardUnit}>oz</Text>
+                </Text>
+                <Text style={styles.statCardLabel}>of {mlToOz(fluidGoalMl).toFixed(0)} oz goal</Text>
+              </Card>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.statCardWrapper}
+              onPress={() => router.push('/weight-history')}
+              disabled={!latestWeight}
+            >
+              <Card style={styles.statCard}>
+                <Ionicons name="trending-down" size={20} color={colors.weight} />
+                {latestWeight ? (
+                  <>
+                    <Text style={styles.statCardValue}>
+                      {(settings?.weightUnit === 'kg' ? latestWeight.weightKg : latestWeight.weightKg * KG_TO_LB).toFixed(
+                        1,
+                      )}{' '}
+                      <Text style={styles.statCardUnit}>{settings?.weightUnit ?? 'lb'}</Text>
+                    </Text>
+                    <Text style={styles.statCardLabel}>
+                      {new Date(latestWeight.recordedAt).toLocaleDateString()}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={styles.statCardLabel}>No weigh-ins yet</Text>
+                )}
+              </Card>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.mealsHeading}>Meals</Text>
         </View>
       }
       renderItem={({ item: meal }) => (
@@ -127,28 +178,54 @@ export default function DashboardScreen() {
   );
 }
 
-function GoalProgress({
+function CalorieStat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <View style={styles.calorieStatRow}>
+      <Text style={styles.calorieStatLabel}>{label}</Text>
+      <Text style={[styles.calorieStatValue, highlight && styles.ringValueDanger]}>{value}</Text>
+    </View>
+  );
+}
+
+function MacroBar({
   label,
   value,
   goal,
-  unit,
+  progress,
   color,
+  unit,
 }: {
   label: string;
   value: number;
   goal: number;
-  unit: string;
+  progress: number;
   color: string;
+  unit: string;
 }) {
-  const progress = goal > 0 ? Math.min(1, value / goal) : 0;
   return (
-    <View style={styles.goalRow}>
-      <Text style={styles.goalLabel}>
-        {label} ({Math.round(value)} / {Math.round(goal)} {unit})
-      </Text>
-      <View style={styles.goalTrack}>
-        <View style={[styles.goalFill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+    <View style={styles.macroBarBlock}>
+      <View style={styles.macroBarHeaderRow}>
+        <Text style={styles.macroBarLabel}>{label}</Text>
+        <Text style={styles.macroBarValue}>
+          {Math.round(value)} / {Math.round(goal)} {unit}
+        </Text>
       </View>
+      <View style={styles.macroBarTrack}>
+        <View style={[styles.macroBarFill, { width: `${progress * 100}%`, backgroundColor: color }]} />
+      </View>
+    </View>
+  );
+}
+
+function MacroChip({ label, value, unit, color }: { label: string; value: number; unit: string; color: string }) {
+  return (
+    <View style={styles.macroChip}>
+      <View style={[styles.macroChipDot, { backgroundColor: color }]} />
+      <Text style={styles.macroChipValue}>
+        {Math.round(value)}
+        {unit}
+      </Text>
+      <Text style={styles.macroChipLabel}>{label}</Text>
     </View>
   );
 }
@@ -167,9 +244,12 @@ function MealSection({
   const mealTotal = sumEntries(entries);
 
   return (
-    <View style={styles.mealSection}>
+    <Card style={styles.mealSection}>
       <View style={styles.mealHeaderRow}>
-        <Text style={styles.mealLabel}>{MEAL_LABELS[meal]}</Text>
+        <View style={styles.mealHeaderLeft}>
+          <Ionicons name={MEAL_ICONS[meal]} size={18} color={colors.textSecondary} />
+          <Text style={styles.mealLabel}>{MEAL_LABELS[meal]}</Text>
+        </View>
         <Text style={styles.mealTotalText}>{Math.round(mealTotal.calories)} kcal</Text>
       </View>
 
@@ -198,132 +278,186 @@ function MealSection({
                 {entry.weightG} g · {Math.round(entry.calories)} kcal
               </Text>
             </TouchableOpacity>
-            <Text style={styles.removeLink} onPress={() => onDelete(entry.id)}>
-              Remove
-            </Text>
+            <TouchableOpacity onPress={() => onDelete(entry.id)} hitSlop={8}>
+              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
           </View>
         ))
       )}
 
       <TouchableOpacity
         style={styles.addButton}
-        onPress={() =>
-          router.push({ pathname: '/log/[mealType]/pick-item', params: { mealType: meal, logDate } })
-        }
+        onPress={() => router.push({ pathname: '/log/[mealType]/pick-item', params: { mealType: meal, logDate } })}
       >
-        <Text style={styles.addButtonText}>+ Add to {MEAL_LABELS[meal]}</Text>
+        <Ionicons name="add-circle" size={18} color={colors.primary} />
+        <Text style={styles.addButtonText}>ADD FOOD</Text>
       </TouchableOpacity>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   header: {
-    gap: 12,
-    marginBottom: 8,
+    gap: spacing.md,
+    marginBottom: spacing.xs,
   },
   dateNavRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  navArrow: {
-    fontSize: 24,
-    paddingHorizontal: 16,
-    color: '#555',
+    paddingHorizontal: spacing.sm,
   },
   dateHeading: {
-    fontSize: 18,
-    fontWeight: '700',
+    ...typography.heading,
   },
-  totalsBox: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 12,
-    padding: 12,
+  calorieCard: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.lg,
   },
-  totalsText: {
-    fontSize: 22,
+  ringValue: {
+    fontSize: 30,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  ringValueDanger: {
+    color: colors.danger,
+  },
+  ringLabel: {
+    ...typography.caption,
+    marginTop: 2,
+  },
+  calorieStatsColumn: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  calorieStatRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.sm,
+  },
+  calorieStatLabel: {
+    ...typography.caption,
+  },
+  calorieStatValue: {
+    fontSize: 15,
     fontWeight: '700',
+    color: colors.textPrimary,
   },
-  totalsSubtext: {
-    color: '#666',
+  macrosCard: {
+    gap: spacing.md,
   },
-  goalsBox: {
-    width: '100%',
-    gap: 8,
-    marginTop: 10,
+  macroBarBlock: {
+    gap: spacing.xs,
   },
-  goalRow: {
-    gap: 4,
+  macroBarHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  goalLabel: {
-    fontSize: 12,
-    color: '#666',
+  macroBarLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
-  goalTrack: {
+  macroBarValue: {
+    ...typography.caption,
+  },
+  macroBarTrack: {
     height: 8,
-    borderRadius: 4,
-    backgroundColor: '#e5e7eb',
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
     overflow: 'hidden',
   },
-  goalFill: {
+  macroBarFill: {
     height: '100%',
   },
-  weightCard: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
+  macroChipsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  weightCardText: {
-    fontSize: 18,
+  macroChip: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  macroChipDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 2,
+  },
+  macroChipValue: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#1d4ed8',
+    color: colors.textPrimary,
   },
-  weightCardSubtext: {
-    fontSize: 12,
-    color: '#666',
+  macroChipLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
   },
-  fluidStrip: {
-    backgroundColor: '#e0f2fe',
-    borderRadius: 12,
-    padding: 12,
-    alignItems: 'center',
+  statCardsRow: {
+    flexDirection: 'row',
+    gap: spacing.md,
   },
-  fluidStripText: {
-    fontSize: 15,
+  statCardWrapper: {
+    flex: 1,
+  },
+  statCard: {
+    alignItems: 'flex-start',
+    gap: 4,
+    padding: spacing.md,
+  },
+  statCardValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  statCardUnit: {
+    fontSize: 13,
     fontWeight: '600',
-    color: '#0369a1',
+    color: colors.textSecondary,
+  },
+  statCardLabel: {
+    ...typography.caption,
+  },
+  mealsHeading: {
+    ...typography.label,
+    marginTop: spacing.xs,
+    marginLeft: spacing.xs,
+    textTransform: 'uppercase',
   },
   mealSection: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    gap: 8,
+    gap: spacing.sm,
   },
   mealHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  mealHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   mealLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   mealTotalText: {
-    color: '#666',
+    ...typography.caption,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textMuted,
     fontSize: 13,
   },
   entryRow: {
@@ -337,21 +471,23 @@ const styles = StyleSheet.create({
   },
   entryName: {
     fontSize: 15,
+    color: colors.textPrimary,
   },
   entrySubtext: {
     fontSize: 12,
-    color: '#888',
-  },
-  removeLink: {
-    color: '#c00',
-    fontSize: 13,
+    color: colors.textMuted,
   },
   addButton: {
     marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     alignSelf: 'flex-start',
   },
   addButtonText: {
-    color: '#2563eb',
-    fontWeight: '600',
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 13,
+    letterSpacing: 0.3,
   },
 });

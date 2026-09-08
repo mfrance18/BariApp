@@ -1,9 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { AppButton } from '../../src/components/ui/AppButton';
+import { Card } from '../../src/components/ui/Card';
 import { createEntry, deleteEntry, listEntriesForDate, type FluidLogEntry } from '../../src/db/repositories/fluidRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
+import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { todayLogDateKey } from '../../src/utils/date';
 import { mlToOz, ozToMl } from '../../src/utils/units';
 
@@ -50,19 +54,24 @@ export default function FluidsScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.heading}>Today&apos;s Fluids</Text>
-          <View style={styles.progressBox}>
-            <Text style={styles.progressText}>
-              {formatOz(totalOz)} / {formatOz(goalOz)} oz
-            </Text>
+
+          <Card style={styles.progressCard}>
+            <View style={styles.progressHeaderRow}>
+              <Ionicons name="water" size={20} color={colors.fluid} />
+              <Text style={styles.progressText}>
+                {formatOz(totalOz)} / {formatOz(goalOz)} oz
+              </Text>
+            </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
             </View>
-          </View>
+          </Card>
 
-          <Text style={styles.sectionLabel}>Cups</Text>
+          <Text style={styles.sectionLabel}>CUPS</Text>
           <View style={styles.quickAddRow}>
             {CUPS_OZ.map((oz) => (
               <TouchableOpacity key={oz} style={styles.quickAddButton} onPress={() => addMutation.mutate(oz)}>
+                <Ionicons name="cafe-outline" size={16} color={colors.fluid} />
                 <Text style={styles.quickAddButtonText}>{oz} oz</Text>
               </TouchableOpacity>
             ))}
@@ -72,11 +81,12 @@ export default function FluidsScreen() {
             <TextInput
               style={styles.input}
               placeholder="Custom amount (oz)"
+              placeholderTextColor={colors.textMuted}
               keyboardType="decimal-pad"
               value={customAmount}
               onChangeText={setCustomAmount}
             />
-            <Button
+            <AppButton
               title="Add"
               onPress={() => {
                 const value = Number(customAmount);
@@ -84,6 +94,8 @@ export default function FluidsScreen() {
               }}
             />
           </View>
+
+          {(entries ?? []).length > 0 && <Text style={styles.sectionLabel}>TODAY</Text>}
         </View>
       }
       renderItem={({ item }) => <FluidRow entry={item} onDelete={() => deleteMutation.mutate(item.id)} />}
@@ -95,13 +107,14 @@ export default function FluidsScreen() {
 function FluidRow({ entry, onDelete }: { entry: FluidLogEntry; onDelete: () => void }) {
   return (
     <View style={styles.row}>
+      <Ionicons name="water-outline" size={18} color={colors.fluid} />
       <Text style={styles.rowText}>
         {formatOz(mlToOz(entry.amountMl))} oz ·{' '}
         {new Date(entry.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </Text>
-      <Text style={styles.removeLink} onPress={onDelete}>
-        Remove
-      </Text>
+      <TouchableOpacity onPress={onDelete} hitSlop={8}>
+        <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -109,85 +122,95 @@ function FluidRow({ entry, onDelete }: { entry: FluidLogEntry; onDelete: () => v
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    gap: 8,
+    padding: spacing.lg,
+    gap: spacing.sm,
   },
   header: {
-    gap: 12,
-    marginBottom: 8,
+    gap: spacing.md,
+    marginBottom: spacing.xs,
   },
   heading: {
-    fontSize: 20,
-    fontWeight: '700',
+    ...typography.title,
   },
-  progressBox: {
-    gap: 6,
+  progressCard: {
+    gap: spacing.sm,
+  },
+  progressHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   progressText: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
   progressTrack: {
     height: 10,
-    borderRadius: 5,
-    backgroundColor: '#e5e7eb',
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.fluid,
   },
   sectionLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#555',
+    ...typography.label,
+    marginLeft: spacing.xs,
   },
   quickAddRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: spacing.sm,
   },
   quickAddButton: {
-    backgroundColor: '#e0f2fe',
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.fluidLight,
+    borderRadius: radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   quickAddButtonText: {
-    color: '#0369a1',
-    fontWeight: '600',
+    color: colors.fluid,
+    fontWeight: '700',
   },
   customRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
   },
   input: {
     flex: 1,
+    backgroundColor: colors.card,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    color: colors.textPrimary,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    gap: spacing.sm,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    marginBottom: spacing.sm,
   },
   rowText: {
+    flex: 1,
     fontSize: 15,
-  },
-  removeLink: {
-    color: '#c00',
-    fontSize: 13,
+    color: colors.textPrimary,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
   },

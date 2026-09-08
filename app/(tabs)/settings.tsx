@@ -1,9 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { ActivityIndicator, Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AppButton } from '../../src/components/ui/AppButton';
+import { Card } from '../../src/components/ui/Card';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { login, logout, syncWeightHistoryToDb } from '../../src/services/vesync/adapter';
+import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { mlToOz } from '../../src/utils/units';
 
 export default function SettingsScreen() {
@@ -51,12 +54,19 @@ export default function SettingsScreen() {
           <>
             <Text style={styles.rowText}>Connected as {settings.vesyncEmail}</Text>
             <View style={styles.buttonRow}>
-              <Button
+              <AppButton
                 title={syncMutation.isPending ? 'Syncing…' : 'Sync Now'}
+                variant="secondary"
+                style={styles.flexButton}
                 onPress={() => syncMutation.mutate()}
                 disabled={syncMutation.isPending}
               />
-              <Button title="Disconnect" color="#c00" onPress={() => logoutMutation.mutate()} />
+              <AppButton
+                title="Disconnect"
+                variant="danger"
+                style={styles.flexButton}
+                onPress={() => logoutMutation.mutate()}
+              />
             </View>
             {syncMutation.data && (
               <Text style={styles.helperText}>Synced {syncMutation.data.synced} new reading(s).</Text>
@@ -67,6 +77,7 @@ export default function SettingsScreen() {
             <TextInput
               style={styles.input}
               placeholder="VeSync email"
+              placeholderTextColor={colors.textMuted}
               autoCapitalize="none"
               keyboardType="email-address"
               value={email}
@@ -75,11 +86,12 @@ export default function SettingsScreen() {
             <TextInput
               style={styles.input}
               placeholder="Password"
+              placeholderTextColor={colors.textMuted}
               secureTextEntry
               value={password}
               onChangeText={setPassword}
             />
-            <Button
+            <AppButton
               title={loginMutation.isPending ? 'Connecting…' : 'Connect'}
               onPress={() => loginMutation.mutate()}
               disabled={loginMutation.isPending || !email || !password}
@@ -91,12 +103,12 @@ export default function SettingsScreen() {
         )}
       </Section>
       <Section title="Daily Goals">
-        <Text style={styles.rowText}>Calories: {settings.dailyCalorieGoal}</Text>
-        <Text style={styles.rowText}>Protein: {settings.dailyProteinGoalG} g</Text>
-        <Text style={styles.rowText}>Fluid: {mlToOz(settings.dailyFluidGoalMl).toFixed(0)} oz</Text>
+        <SettingsRow label="Calories" value={`${settings.dailyCalorieGoal}`} />
+        <SettingsRow label="Protein" value={`${settings.dailyProteinGoalG} g`} />
+        <SettingsRow label="Fluid" value={`${mlToOz(settings.dailyFluidGoalMl).toFixed(0)} oz`} />
       </Section>
       <Section title="Units">
-        <Text style={styles.rowText}>Weight unit: {settings.weightUnit}</Text>
+        <SettingsRow label="Weight unit" value={settings.weightUnit} />
       </Section>
     </ScrollView>
   );
@@ -104,9 +116,18 @@ export default function SettingsScreen() {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+    <Card style={styles.section}>
+      <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
       {children}
+    </Card>
+  );
+}
+
+function SettingsRow({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.settingsRow}>
+      <Text style={styles.rowText}>{label}</Text>
+      <Text style={styles.rowValue}>{value}</Text>
     </View>
   );
 }
@@ -114,10 +135,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
-    gap: 16,
+    padding: spacing.lg,
+    gap: spacing.md,
   },
   center: {
     flex: 1,
@@ -125,39 +147,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   section: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
+    gap: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 4,
-    color: '#555',
+    ...typography.label,
+    marginBottom: spacing.xs,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   rowText: {
     fontSize: 15,
+    color: colors.textPrimary,
+  },
+  rowValue: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textSecondary,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     fontSize: 15,
+    color: colors.textPrimary,
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
+  },
+  flexButton: {
+    flex: 1,
   },
   helperText: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
   },
   errorText: {
-    color: '#c00',
+    color: colors.danger,
     fontSize: 13,
   },
 });

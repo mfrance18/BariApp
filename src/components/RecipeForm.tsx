@@ -1,9 +1,13 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { listFoods, type Food } from '../db/repositories/foodsRepo';
 import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
+import { colors, radius, spacing, typography } from '../theme/theme';
+import { AppButton } from './ui/AppButton';
+import { Card } from './ui/Card';
 
 export interface RecipeIngredientDraft {
   food: Food;
@@ -120,25 +124,32 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit }:
       keyExtractor={(item, index) => `${item.food.id}-${index}`}
       ListHeaderComponent={
         <View style={styles.headerFields}>
-          <Field label="Name" value={name} onChangeText={setName} />
-          <Field label="Servings" value={servings} onChangeText={setServings} keyboardType="decimal-pad" />
-          <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
+          <Card style={styles.card}>
+            <Field label="Name" value={name} onChangeText={setName} />
+            <Field label="Servings" value={servings} onChangeText={setServings} keyboardType="decimal-pad" />
+            <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
+          </Card>
 
-          <Text style={styles.sectionLabel}>Ingredients</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Search foods to add…"
-            value={searchText}
-            onChangeText={setSearchText}
-          />
+          <Text style={styles.sectionLabel}>INGREDIENTS</Text>
+          <View style={styles.searchRow}>
+            <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search foods to add…"
+              placeholderTextColor={colors.textMuted}
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+          </View>
           {searchResults && searchResults.length > 0 && (
-            <View style={styles.searchResults}>
+            <Card style={styles.searchResults}>
               {searchResults.map((food) => (
                 <TouchableOpacity key={food.id} style={styles.searchResultRow} onPress={() => addIngredient(food)}>
-                  <Text>{food.name}</Text>
+                  <Text style={styles.searchResultText}>{food.name}</Text>
+                  <Ionicons name="add-circle" size={20} color={colors.primary} />
                 </TouchableOpacity>
               ))}
-            </View>
+            </Card>
           )}
         </View>
       }
@@ -152,26 +163,24 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit }:
             keyboardType="decimal-pad"
           />
           <Text style={styles.gramsLabel}>g</Text>
-          <Text style={styles.removeLink} onPress={() => removeIngredient(index)}>
-            Remove
-          </Text>
+          <TouchableOpacity onPress={() => removeIngredient(index)} hitSlop={8}>
+            <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+          </TouchableOpacity>
         </View>
       )}
       ListEmptyComponent={<Text style={styles.emptyText}>No ingredients added yet</Text>}
       ListFooterComponent={
         <View style={styles.footer}>
           {preview && (
-            <View style={styles.previewBox}>
-              <Text style={styles.previewTitle}>
-                Batch weight: {preview.totalWeightG.toFixed(0)} g
-              </Text>
+            <Card style={styles.previewBox}>
+              <Text style={styles.previewTitle}>Batch weight: {preview.totalWeightG.toFixed(0)} g</Text>
               <Text style={styles.previewText}>
                 Per serving: {preview.perServing.calories} kcal · {preview.perServing.proteinG} g protein
               </Text>
-            </View>
+            </Card>
           )}
           {error && <Text style={styles.errorText}>{error}</Text>}
-          <Button title={submitting ? 'Saving…' : submitLabel} onPress={handleSubmit} disabled={submitting} />
+          <AppButton title={submitting ? 'Saving…' : submitLabel} onPress={handleSubmit} disabled={submitting} />
         </View>
       }
     />
@@ -200,6 +209,7 @@ function Field({
         onChangeText={onChangeText}
         keyboardType={keyboardType}
         multiline={multiline}
+        placeholderTextColor={colors.textMuted}
       />
     </View>
   );
@@ -208,100 +218,123 @@ function Field({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   content: {
-    padding: 16,
+    padding: spacing.lg,
     paddingBottom: 48,
   },
   headerFields: {
-    gap: 12,
-    marginBottom: 8,
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  card: {
+    gap: spacing.md,
   },
   field: {
-    gap: 4,
+    gap: spacing.xs,
   },
   fieldLabel: {
     fontSize: 13,
-    color: '#555',
+    color: colors.textSecondary,
   },
   input: {
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     fontSize: 15,
+    color: colors.textPrimary,
   },
   inputMultiline: {
     minHeight: 60,
     textAlignVertical: 'top',
   },
   sectionLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginTop: 8,
-    color: '#333',
+    ...typography.label,
+    marginLeft: spacing.xs,
+  },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: spacing.sm + 2,
+    color: colors.textPrimary,
   },
   searchResults: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    padding: 0,
+    overflow: 'hidden',
   },
   searchResultRow: {
-    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    borderBottomColor: colors.border,
+  },
+  searchResultText: {
+    color: colors.textPrimary,
   },
   ingredientRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
+    gap: spacing.sm,
+    backgroundColor: colors.card,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.sm,
   },
   ingredientName: {
     flex: 1,
     fontSize: 15,
+    color: colors.textPrimary,
   },
   quantityInput: {
     width: 60,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#ccc',
-    borderRadius: 6,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
     paddingHorizontal: 6,
     paddingVertical: 4,
     textAlign: 'right',
+    color: colors.textPrimary,
   },
   gramsLabel: {
-    color: '#777',
-  },
-  removeLink: {
-    color: '#c00',
-    fontSize: 13,
+    color: colors.textMuted,
   },
   emptyText: {
-    color: '#888',
+    color: colors.textMuted,
     paddingVertical: 12,
   },
   footer: {
-    gap: 12,
-    marginTop: 16,
+    gap: spacing.md,
+    marginTop: spacing.lg,
   },
   previewBox: {
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    padding: 12,
-    gap: 4,
+    gap: spacing.xs,
   },
   previewTitle: {
     fontWeight: '600',
+    color: colors.textPrimary,
   },
   previewText: {
-    color: '#444',
+    color: colors.textSecondary,
   },
   errorText: {
-    color: '#c00',
+    color: colors.danger,
     fontSize: 13,
   },
 });
