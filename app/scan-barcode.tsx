@@ -74,7 +74,7 @@ export default function ScanBarcodeScreen() {
   if (!permission) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }

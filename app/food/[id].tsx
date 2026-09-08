@@ -54,7 +54,7 @@ export default function EditFoodScreen() {
   if (isLoading || !food) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }

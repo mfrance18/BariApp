@@ -153,12 +153,12 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   noticeBox: {
-    backgroundColor: '#FEF6E7',
+    backgroundColor: colors.warningLight,
     borderRadius: radius.md,
     padding: spacing.sm,
   },
   noticeText: {
     fontSize: 12,
-    color: '#8A5A00',
+    color: colors.warning,
   },
 });

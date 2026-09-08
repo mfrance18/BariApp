@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { Stack } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -46,7 +47,7 @@ export default function RootLayout() {
   if (!migrationsSuccess || !seeded) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -54,6 +55,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
+        <StatusBar style="light" />
         <Stack
           screenOptions={{
             headerShown: false,
@@ -86,15 +88,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
     gap: 8,
+    backgroundColor: colors.background,
   },
   errorTitle: {
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+    color: colors.textPrimary,
   },
   errorDetail: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSecondary,
     textAlign: 'center',
   },
 });

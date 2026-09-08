@@ -164,7 +164,7 @@ export default function EditVitaminMedScreen() {
   if (!isNew && !initialized) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }

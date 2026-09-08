@@ -53,7 +53,7 @@ export default function EditRecipeScreen() {
   if (isLoading || !recipe) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
