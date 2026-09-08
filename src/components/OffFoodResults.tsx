@@ -55,20 +55,15 @@ export function OffFoodResults({ results, loading, error, onRetry, context }: Of
   return (
     <View style={styles.container}>
       <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
-      {results.map((product) => {
-        const subtitle = [product.brands?.split(',')[0]?.trim(), product.generic_name?.trim()]
-          .filter(Boolean)
-          .join(' · ');
-        return (
-          <TouchableOpacity key={product.code} style={styles.row} onPress={() => handlePress(product)}>
-            <View style={styles.rowTextGroup}>
-              <Text style={styles.rowTitle}>{product.product_name}</Text>
-              {subtitle ? <Text style={styles.rowSubtitle}>{subtitle}</Text> : null}
-            </View>
-            <Text style={styles.addLabel}>Add</Text>
-          </TouchableOpacity>
-        );
-      })}
+      {results.map((product) => (
+        <TouchableOpacity key={product.code} style={styles.row} onPress={() => handlePress(product)}>
+          <View style={styles.rowTextGroup}>
+            <Text style={styles.rowTitle}>{product.product_name}</Text>
+            {product.brands ? <Text style={styles.rowSubtitle}>{product.brands.split(',')[0]?.trim()}</Text> : null}
+          </View>
+          <Text style={styles.addLabel}>Add</Text>
+        </TouchableOpacity>
+      ))}
     </View>
   );
 }
