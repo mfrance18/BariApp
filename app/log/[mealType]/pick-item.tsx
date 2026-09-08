@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { listFoods } from '../../../src/db/repositories/foodsRepo';
 import { listRecipes } from '../../../src/db/repositories/recipesRepo';
@@ -53,6 +53,29 @@ export default function PickItemScreen() {
         value={query}
         onChangeText={setQuery}
       />
+
+      {tab === 'foods' && (
+        <View style={styles.actionsRow}>
+          <Button
+            title="+ New Food"
+            onPress={() =>
+              router.push({
+                pathname: '/library/food/new',
+                params: { logMealType: mealType, logDate: effectiveLogDate },
+              })
+            }
+          />
+          <Button
+            title="Scan Barcode"
+            onPress={() =>
+              router.push({
+                pathname: '/scan-barcode',
+                params: { returnTo: '/library/food/new', logMealType: mealType, logDate: effectiveLogDate },
+              })
+            }
+          />
+        </View>
+      )}
 
       {tab === 'foods' ? (
         <FlatList
@@ -123,6 +146,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: 8,
   },
   row: {
     paddingVertical: 12,

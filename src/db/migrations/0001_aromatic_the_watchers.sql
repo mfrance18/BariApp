@@ -1,0 +1,1 @@
+ALTER TABLE `foods` ADD `serving_size_unit` text DEFAULT 'g' NOT NULL;

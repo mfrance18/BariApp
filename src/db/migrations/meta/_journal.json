@@ -8,6 +8,13 @@
       "when": 1788823640685,
       "tag": "0000_mysterious_blob",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788828256639,
+      "tag": "0001_aromatic_the_watchers",
+      "breakpoints": true
     }
   ]
 }

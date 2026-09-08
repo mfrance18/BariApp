@@ -5,7 +5,9 @@ import { EMPTY_FOOD_FORM_VALUES, FoodForm, type FoodFormValues, type ParsedFoodV
 import { createFood } from '../../../../src/db/repositories/foodsRepo';
 
 export default function NewFoodScreen() {
-  const params = useLocalSearchParams<Partial<Record<keyof FoodFormValues | 'source', string>>>();
+  const params = useLocalSearchParams<
+    Partial<Record<keyof FoodFormValues | 'source', string>> & { logMealType?: string; logDate?: string }
+  >();
   const queryClient = useQueryClient();
 
   const initialValues: FoodFormValues = {
@@ -25,9 +27,16 @@ export default function NewFoodScreen() {
   const mutation = useMutation({
     mutationFn: (values: ParsedFoodValues) =>
       createFood({ ...values, source: params.source === 'open_food_facts' ? 'open_food_facts' : 'manual' }),
-    onSuccess: () => {
+    onSuccess: (food) => {
       queryClient.invalidateQueries({ queryKey: ['foods'] });
-      router.back();
+      if (params.logMealType) {
+        router.replace({
+          pathname: '/log/[mealType]/weigh',
+          params: { mealType: params.logMealType, itemType: 'food', itemId: String(food.id), logDate: params.logDate },
+        });
+      } else {
+        router.back();
+      }
     },
   });
 
@@ -37,7 +46,12 @@ export default function NewFoodScreen() {
       submitLabel="Save Food"
       submitting={mutation.isPending}
       onSubmit={(values) => mutation.mutate(values)}
-      onScanBarcode={() => router.push({ pathname: '/scan-barcode', params: { returnTo: '/library/food/new' } })}
+      onScanBarcode={() =>
+        router.push({
+          pathname: '/scan-barcode',
+          params: { returnTo: '/library/food/new', logMealType: params.logMealType, logDate: params.logDate },
+        })
+      }
     />
   );
 }

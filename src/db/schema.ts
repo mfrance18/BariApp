@@ -20,6 +20,9 @@ export const foods = sqliteTable(
       .notNull()
       .default('per_100g'),
     servingSizeG: real('serving_size_g'),
+    servingSizeUnit: text('serving_size_unit', { enum: ['g', 'oz'] })
+      .notNull()
+      .default('g'),
     servingLabel: text('serving_label'),
     calories: real('calories').notNull().default(0),
     proteinG: real('protein_g').notNull().default(0),

@@ -4,14 +4,20 @@ import { ActivityIndicator, Button, StyleSheet, View } from 'react-native';
 
 import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../../../src/components/FoodForm';
 import { archiveFood, getFoodById, updateFood, type Food } from '../../../../src/db/repositories/foodsRepo';
+import { mlToOz } from '../../../../src/utils/units';
 
 function foodToFormValues(food: Food): FoodFormValues {
+  const servingSize =
+    food.servingSizeG == null
+      ? ''
+      : String(food.servingSizeUnit === 'oz' ? mlToOz(food.servingSizeG) : food.servingSizeG);
   return {
     name: food.name,
     brand: food.brand ?? '',
     barcode: food.barcode ?? '',
     basisType: food.basisType,
-    servingSizeG: food.servingSizeG != null ? String(food.servingSizeG) : '',
+    servingSize,
+    servingSizeUnit: food.servingSizeUnit,
     servingLabel: food.servingLabel ?? '',
     calories: String(food.calories),
     proteinG: String(food.proteinG),

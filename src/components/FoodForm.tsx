@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { roundNutritionForDisplay } from '../services/nutrition/scaling';
+import { ozToMl } from '../utils/units';
 
 export interface FoodFormValues {
   name: string;
   brand: string;
   barcode: string;
   basisType: 'per_100g' | 'per_serving';
-  servingSizeG: string;
+  servingSize: string;
+  servingSizeUnit: 'g' | 'oz';
   servingLabel: string;
   calories: string;
   proteinG: string;
@@ -25,7 +27,8 @@ export const EMPTY_FOOD_FORM_VALUES: FoodFormValues = {
   brand: '',
   barcode: '',
   basisType: 'per_100g',
-  servingSizeG: '',
+  servingSize: '',
+  servingSizeUnit: 'g',
   servingLabel: '',
   calories: '',
   proteinG: '',
@@ -43,6 +46,7 @@ export interface ParsedFoodValues {
   barcode: string | null;
   basisType: 'per_100g' | 'per_serving';
   servingSizeG: number | null;
+  servingSizeUnit: 'g' | 'oz';
   servingLabel: string | null;
   calories: number;
   proteinG: number;
@@ -58,10 +62,14 @@ export function parseFoodFormValues(values: FoodFormValues): ParsedFoodValues | 
   if (!values.name.trim()) {
     return { error: 'Name is required' };
   }
-  const servingSizeG = values.servingSizeG ? Number(values.servingSizeG) : null;
-  if (values.basisType === 'per_serving' && (!servingSizeG || servingSizeG <= 0)) {
-    return { error: 'Serving size (g) must be greater than 0' };
+  const enteredServingSize = values.servingSize ? Number(values.servingSize) : null;
+  if (values.basisType === 'per_serving' && (!enteredServingSize || enteredServingSize <= 0)) {
+    return { error: 'Serving size must be greater than 0' };
   }
+  // Serving size is always stored in grams; oz is converted using the same
+  // fl-oz-to-mL factor the Fluids tab uses (water-equivalent density, fine
+  // for the packaged drinks/foods this is meant for).
+  const servingSizeG = enteredServingSize == null ? null : values.servingSizeUnit === 'oz' ? ozToMl(enteredServingSize) : enteredServingSize;
   const num = (s: string) => (s.trim() ? Number(s) : 0);
   return {
     name: values.name.trim(),
@@ -69,6 +77,7 @@ export function parseFoodFormValues(values: FoodFormValues): ParsedFoodValues | 
     barcode: values.barcode.trim() || null,
     basisType: values.basisType,
     servingSizeG,
+    servingSizeUnit: values.servingSizeUnit,
     servingLabel: values.servingLabel.trim() || null,
     calories: num(values.calories),
     proteinG: num(values.proteinG),
@@ -108,8 +117,9 @@ export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onS
   }
 
   function scaleValuesToServing() {
-    const grams = Number(values.servingSizeG);
-    if (!grams || grams <= 0) return;
+    const entered = Number(values.servingSize);
+    if (!entered || entered <= 0) return;
+    const grams = values.servingSizeUnit === 'oz' ? ozToMl(entered) : entered;
     const factor = grams / 100;
     const num = (s: string) => (s.trim() ? Number(s) : 0);
     const scaled = roundNutritionForDisplay({
@@ -162,14 +172,27 @@ export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onS
 
       {values.basisType === 'per_serving' && (
         <>
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Serving size</Text>
+            <View style={styles.servingSizeRow}>
+              <TextInput
+                style={[styles.input, styles.servingSizeInput]}
+                value={values.servingSize}
+                onChangeText={(v) => set('servingSize', v)}
+                keyboardType="decimal-pad"
+              />
+              <View style={styles.unitSegmentRow}>
+                <UnitButton label="g" active={values.servingSizeUnit === 'g'} onPress={() => set('servingSizeUnit', 'g')} />
+                <UnitButton
+                  label="oz"
+                  active={values.servingSizeUnit === 'oz'}
+                  onPress={() => set('servingSizeUnit', 'oz')}
+                />
+              </View>
+            </View>
+          </View>
           <Field
-            label="Serving size (g)"
-            value={values.servingSizeG}
-            onChangeText={(v) => set('servingSizeG', v)}
-            keyboardType="decimal-pad"
-          />
-          <Field
-            label="Serving label (e.g. 1 bar)"
+            label="Serving label (e.g. 1 bottle)"
             value={values.servingLabel}
             onChangeText={(v) => set('servingLabel', v)}
           />
@@ -241,6 +264,14 @@ function SegmentButton({ label, active, onPress }: { label: string; active: bool
   );
 }
 
+function UnitButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Text onPress={onPress} style={[styles.unitButton, active && styles.segmentButtonActive]}>
+      {label}
+    </Text>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -290,6 +321,26 @@ const styles = StyleSheet.create({
   segmentButtonActive: {
     backgroundColor: '#dbeafe',
     fontWeight: '700',
+  },
+  servingSizeRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  servingSizeInput: {
+    flex: 1,
+  },
+  unitSegmentRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  unitButton: {
+    textAlign: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#eee',
+    overflow: 'hidden',
   },
   errorText: {
     color: '#c00',

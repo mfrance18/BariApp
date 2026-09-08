@@ -10,12 +10,17 @@ import { getFoodByBarcode } from '../src/db/repositories/foodsRepo';
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
 
 export default function ScanBarcodeScreen() {
-  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
+  const { returnTo, logMealType, logDate } = useLocalSearchParams<{
+    returnTo?: string;
+    logMealType?: string;
+    logDate?: string;
+  }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [lookingUp, setLookingUp] = useState(false);
   const handledRef = useRef(false);
 
   const destination = returnTo ?? '/library/food/new';
+  const context = { logMealType, logDate };
 
   async function handleBarcodeScanned({ data: barcode }: BarcodeScanningResult) {
     if (handledRef.current) return;
@@ -24,14 +29,21 @@ export default function ScanBarcodeScreen() {
 
     const existingFood = await getFoodByBarcode(barcode);
     if (existingFood) {
-      router.replace(`/library/food/${existingFood.id}`);
+      if (logMealType) {
+        router.replace({
+          pathname: '/log/[mealType]/weigh',
+          params: { mealType: logMealType, itemType: 'food', itemId: String(existingFood.id), logDate },
+        });
+      } else {
+        router.replace(`/library/food/${existingFood.id}`);
+      }
       return;
     }
 
     const product = await getProductByBarcode(barcode);
 
     if (!product) {
-      router.replace({ pathname: destination as never, params: { barcode } });
+      router.replace({ pathname: destination as never, params: { barcode, ...context } });
       return;
     }
 
@@ -50,6 +62,7 @@ export default function ScanBarcodeScreen() {
         sugarG: String(food.sugarG),
         sodiumMg: String(food.sodiumMg),
         source: 'open_food_facts',
+        ...context,
       },
     });
   }
@@ -79,6 +92,14 @@ export default function ScanBarcodeScreen() {
         barcodeScannerSettings={{ barcodeTypes: [...BARCODE_TYPES] }}
         onBarcodeScanned={lookingUp ? undefined : handleBarcodeScanned}
       />
+      <View style={styles.scanFrameContainer} pointerEvents="none">
+        <View style={styles.scanFrame}>
+          <View style={[styles.corner, styles.cornerTopLeft]} />
+          <View style={[styles.corner, styles.cornerTopRight]} />
+          <View style={[styles.corner, styles.cornerBottomLeft]} />
+          <View style={[styles.corner, styles.cornerBottomRight]} />
+        </View>
+      </View>
       <View style={styles.overlay}>
         {lookingUp ? (
           <>
@@ -107,6 +128,53 @@ const styles = StyleSheet.create({
   message: {
     textAlign: 'center',
     fontSize: 15,
+  },
+  scanFrameContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanFrame: {
+    width: 280,
+    height: 170,
+  },
+  corner: {
+    position: 'absolute',
+    width: 32,
+    height: 32,
+    borderColor: '#fff',
+  },
+  cornerTopLeft: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 4,
+    borderLeftWidth: 4,
+    borderTopLeftRadius: 8,
+  },
+  cornerTopRight: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 4,
+    borderRightWidth: 4,
+    borderTopRightRadius: 8,
+  },
+  cornerBottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 4,
+    borderLeftWidth: 4,
+    borderBottomLeftRadius: 8,
+  },
+  cornerBottomRight: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 4,
+    borderRightWidth: 4,
+    borderBottomRightRadius: 8,
   },
   overlay: {
     position: 'absolute',
