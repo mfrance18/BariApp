@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../../src/components/ui/AppButton';
@@ -20,6 +22,7 @@ import {
 import { ensureNotificationPermission } from '../../../src/services/notifications/permissions';
 import { rescheduleAll } from '../../../src/services/notifications/scheduler';
 import { colors, radius, spacing, typography } from '../../../src/theme/theme';
+import { formatTimeOfDay } from '../../../src/utils/date';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -57,6 +60,14 @@ function to24HourTimeOfDay(hour: string, minute: string, period: 'AM' | 'PM'): s
   return `${pad(String(hour24))}:${pad(minute)}`;
 }
 
+/** For handing to DateTimePicker — only the hour/minute matter, the date part is arbitrary. */
+function scheduleToDate(schedule: ScheduleDraft): Date {
+  const [h, m] = to24HourTimeOfDay(schedule.hour, schedule.minute, schedule.period).split(':').map(Number);
+  const date = new Date();
+  date.setHours(h, m, 0, 0);
+  return date;
+}
+
 export default function EditVitaminMedScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const isNew = id === 'new';
@@ -70,6 +81,7 @@ export default function EditVitaminMedScreen() {
   const [schedules, setSchedules] = useState<ScheduleDraft[]>(isNew ? [newScheduleDraft()] : []);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(isNew);
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
 
   const medQuery = useQuery({
     queryKey: ['vitaminsMeds', vitaminMedId],
@@ -116,6 +128,18 @@ export default function EditVitaminMedScreen() {
 
   function removeScheduleDraft(index: number) {
     setSchedules((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleTimeChange(event: DateTimePickerEvent, date?: Date) {
+    // Android's picker is its own modal dialog and reports one final choice
+    // (or a cancel) — close it here. iOS's inline spinner keeps firing as
+    // the user scrolls, so it stays open until they tap Done.
+    if (Platform.OS === 'android') setPickerIndex(null);
+    if (event.type === 'dismissed' || !date || pickerIndex == null) return;
+    const hour24 = date.getHours();
+    const period: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM';
+    const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+    updateSchedule_(pickerIndex, { hour: String(hour12), minute: pad(String(date.getMinutes())), period });
   }
 
   const saveMutation = useMutation({
@@ -188,6 +212,7 @@ export default function EditVitaminMedScreen() {
   }
 
   return (
+    <>
     <KeyboardAwareScrollView
       style={styles.container}
       contentContainerStyle={StyleSheet.flatten(styles.content)}
@@ -217,31 +242,12 @@ export default function EditVitaminMedScreen() {
       {schedules.map((schedule, index) => (
         <Card key={index} style={styles.scheduleCard}>
           <View style={styles.timeRow}>
-            <TextInput
-              style={styles.timeInput}
-              value={schedule.hour}
-              onChangeText={(v) => updateSchedule_(index, { hour: v })}
-              keyboardType="number-pad"
-              maxLength={2}
-            />
-            <Text style={styles.timeColon}>:</Text>
-            <TextInput
-              style={styles.timeInput}
-              value={schedule.minute}
-              onChangeText={(v) => updateSchedule_(index, { minute: v })}
-              keyboardType="number-pad"
-              maxLength={2}
-            />
-            <View style={styles.periodControl}>
-              <SegmentedControl
-                options={[
-                  { label: 'AM', value: 'AM' as const },
-                  { label: 'PM', value: 'PM' as const },
-                ]}
-                value={schedule.period}
-                onChange={(period) => updateSchedule_(index, { period })}
-              />
-            </View>
+            <TouchableOpacity style={styles.timeButton} onPress={() => setPickerIndex(index)}>
+              <Ionicons name="time-outline" size={18} color={colors.primary} />
+              <Text style={styles.timeButtonText}>
+                {formatTimeOfDay(to24HourTimeOfDay(schedule.hour, schedule.minute, schedule.period))}
+              </Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.removeButton} onPress={() => removeScheduleDraft(index)} hitSlop={8}>
               <Text style={styles.removeLink}>Remove</Text>
             </TouchableOpacity>
@@ -280,7 +286,29 @@ export default function EditVitaminMedScreen() {
           <AppButton title="Archive" variant="danger" onPress={() => archiveMutation.mutate()} />
         </View>
       )}
+
+      {Platform.OS === 'android' && pickerIndex != null && (
+        <DateTimePicker value={scheduleToDate(schedules[pickerIndex])} mode="time" display="default" onChange={handleTimeChange} />
+      )}
     </KeyboardAwareScrollView>
+    {Platform.OS === 'ios' && (
+      <Modal visible={pickerIndex != null} transparent animationType="slide" onRequestClose={() => setPickerIndex(null)}>
+        <View style={styles.pickerModalOverlay}>
+          <Card style={styles.pickerModalCard}>
+            {pickerIndex != null && (
+              <DateTimePicker
+                value={scheduleToDate(schedules[pickerIndex])}
+                mode="time"
+                display="spinner"
+                onChange={handleTimeChange}
+              />
+            )}
+            <AppButton title="Done" onPress={() => setPickerIndex(null)} />
+          </Card>
+        </View>
+      </Modal>
+    )}
+    </>
   );
 }
 
@@ -360,23 +388,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  timeInput: {
-    width: 48,
+  timeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    borderRadius: radius.sm,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    textAlign: 'center',
-    fontSize: 16,
-    color: colors.textPrimary,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
-  timeColon: {
+  timeButtonText: {
     fontSize: 16,
+    fontWeight: '600',
     color: colors.textPrimary,
-  },
-  periodControl: {
-    width: 96,
   },
   removeButton: {
     marginLeft: 'auto',
@@ -412,5 +437,16 @@ const styles = StyleSheet.create({
   },
   deleteRow: {
     marginTop: spacing.sm,
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  pickerModalCard: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    gap: spacing.md,
+    alignItems: 'center',
   },
 });
