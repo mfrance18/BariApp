@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppButton } from '../../../src/components/ui/AppButton';
@@ -31,6 +31,17 @@ export default function PickItemScreen() {
     queryFn: () => listRecipes(query),
     enabled: tab === 'recipes',
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (tab === 'foods') {
+        foodsQuery.refetch();
+      } else {
+        recipesQuery.refetch();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tab]),
+  );
 
   function goToWeigh(itemType: PickTab, itemId: number) {
     router.push({

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
-import { useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { AppButton } from '../../../src/components/ui/AppButton';
@@ -27,6 +27,17 @@ export default function LibraryScreen() {
     queryFn: () => listRecipes(query),
     enabled: activeTab === 'recipes',
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTab === 'foods') {
+        foodsQuery.refetch();
+      } else {
+        recipesQuery.refetch();
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab]),
+  );
 
   return (
     <View style={styles.container}>

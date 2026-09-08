@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
+import { Alert } from 'react-native';
 
 import { EMPTY_FOOD_FORM_VALUES, FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../src/components/FoodForm';
 import { createFood } from '../../src/db/repositories/foodsRepo';
@@ -39,6 +40,14 @@ export default function NewFoodScreen() {
       } else {
         router.back();
       }
+    },
+    onError: (error: Error) => {
+      Alert.alert(
+        'Could not save food',
+        error.message.includes('idx_foods_barcode')
+          ? 'A food with this barcode already exists in your library.'
+          : error.message,
+      );
     },
   });
 

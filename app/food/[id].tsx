@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../src/components/FoodForm';
@@ -41,6 +41,14 @@ export default function EditFoodScreen() {
       queryClient.invalidateQueries({ queryKey: ['foods'] });
       router.back();
     },
+    onError: (error: Error) => {
+      Alert.alert(
+        'Could not save changes',
+        error.message.includes('idx_foods_barcode')
+          ? 'Another food with this barcode already exists in your library.'
+          : error.message,
+      );
+    },
   });
 
   const archiveMutation = useMutation({
@@ -48,6 +56,9 @@ export default function EditFoodScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['foods'] });
       router.back();
+    },
+    onError: (error: Error) => {
+      Alert.alert('Could not delete food', error.message);
     },
   });
 
