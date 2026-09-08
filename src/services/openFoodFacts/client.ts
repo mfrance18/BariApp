@@ -5,6 +5,8 @@ const FIELDS = [
   'code',
   'product_name',
   'brands',
+  'generic_name',
+  'categories',
   'nutriments',
   'serving_size',
   'serving_quantity',
@@ -36,9 +38,11 @@ function normalizeForMatch(text: string): string {
   return text.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-/** The text a product is actually shown by in the UI (name + brand), normalized and joined. */
+/** All the text a product could plausibly be found by, normalized and joined. */
 function productHaystack(product: OffProduct): string {
-  return normalizeForMatch([product.product_name, product.brands].filter(Boolean).join(' '));
+  return normalizeForMatch(
+    [product.product_name, product.brands, product.generic_name, product.categories].filter(Boolean).join(' '),
+  );
 }
 
 /**
@@ -47,16 +51,17 @@ function productHaystack(product: OffProduct): string {
  * swallowed, so a caller (e.g. a react-query queryFn) can tell "no matches"
  * apart from "the request failed" rather than showing both identically.
  *
- * OFF's own search matches loosely (it can surface a product via a
- * category, ingredients text, or other field this app never shows, so a
- * result can look completely unrelated to what was typed). Treat OFF as a
- * candidate source only: fetch a larger pool, then keep just the products
- * where every word of the query actually appears — as a substring,
- * ignoring spacing/punctuation — in the SAME text the user sees (name and
- * brand only, deliberately not category/generic-name/etc., since matching
- * through a field the row doesn't display is indistinguishable from a
- * wrong result to the user), and rank an exact contiguous phrase match
- * above a same-words-anywhere match.
+ * OFF's own ranking mixes in scan popularity, which can bury a real match
+ * behind more-popular-but-less-relevant products. Treat OFF as a candidate
+ * source only: fetch a larger pool, then keep just the products where
+ * every word of the query actually appears — as a substring, ignoring
+ * spacing/punctuation — somewhere across name, brand, generic name, or
+ * category (a product can be a legitimate match without spelling the
+ * search term out in its product name, e.g. "Simon life" by Don Simón
+ * really is an orange juice, per its generic_name/category — the caller
+ * is expected to surface generic_name in the UI so that reasoning is
+ * visible instead of the match looking arbitrary), and rank an exact
+ * contiguous phrase match above a same-words-scattered match.
  */
 export async function searchProductsByName(query: string, limit = 24): Promise<OffProduct[]> {
   const trimmed = query.trim();

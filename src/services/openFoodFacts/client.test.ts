@@ -13,9 +13,9 @@ describe('searchProductsByName', () => {
     jest.restoreAllMocks();
   });
 
-  it('drops results whose displayed name/brand match none of the query words', async () => {
+  it('drops results that match none of the query words in any indexed field', async () => {
     mockFetchOnce([
-      { code: '1', product_name: 'Simon life', brands: 'Don Simón' },
+      { code: '1', product_name: 'Chocolate Bar', brands: 'Cadbury' },
       { code: '2', product_name: 'Pulpy Orange Juice', brands: 'Minute Maid' },
     ]);
 
@@ -24,14 +24,17 @@ describe('searchProductsByName', () => {
     expect(results.map((p) => p.code)).toEqual(['2']);
   });
 
-  it('does not match through fields the row never displays (generic_name/categories)', async () => {
+  it('matches through generic_name/categories even when product_name alone would not', async () => {
+    // e.g. "Simon life" by Don Simón really is an orange juice, just not
+    // spelled out in its product name — the caller is expected to show
+    // generic_name so this isn't a mystery to the user.
     mockFetchOnce([
       { code: '1', product_name: 'Simon life', brands: 'Don Simón', generic_name: 'Orange juice drink' },
     ]);
 
     const results = await searchProductsByName('Orange juice');
 
-    expect(results).toEqual([]);
+    expect(results.map((p) => p.code)).toEqual(['1']);
   });
 
   it('matches "Apple Sauce" against a product literally spelled "Applesauce", ignoring spacing', async () => {
