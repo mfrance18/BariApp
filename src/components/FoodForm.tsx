@@ -112,6 +112,12 @@ interface SecondaryAction {
   disabled?: boolean;
 }
 
+interface ExtraSubmitAction {
+  label: string;
+  onSubmit: (values: ParsedFoodValues) => void;
+  disabled?: boolean;
+}
+
 interface FoodFormProps {
   initialValues: FoodFormValues;
   submitLabel: string;
@@ -119,6 +125,8 @@ interface FoodFormProps {
   onSubmit: (values: ParsedFoodValues) => void;
   onScanBarcode?: () => void;
   secondaryAction?: SecondaryAction;
+  /** A second, equally-valid way to submit the same validated form (e.g. "Weigh It" alongside "Add"). */
+  extraSubmitAction?: ExtraSubmitAction;
 }
 
 export function FoodForm({
@@ -128,6 +136,7 @@ export function FoodForm({
   onSubmit,
   onScanBarcode,
   secondaryAction,
+  extraSubmitAction,
 }: FoodFormProps) {
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState<string | null>(null);
@@ -213,14 +222,14 @@ export function FoodForm({
     });
   }, [values.servingAmount, values.servingUnit]);
 
-  function handleSubmit() {
+  function handleSubmit(action: (values: ParsedFoodValues) => void) {
     const parsed = parseFoodFormValues(values);
     if ('error' in parsed) {
       setError(parsed.error);
       return;
     }
     setError(null);
-    onSubmit(parsed);
+    action(parsed);
   }
 
   const servingDescription =
@@ -327,10 +336,19 @@ export function FoodForm({
       <View style={styles.actionsRow}>
         <AppButton
           title={submitting ? 'Saving…' : submitLabel}
-          onPress={handleSubmit}
+          onPress={() => handleSubmit(onSubmit)}
           disabled={submitting}
           style={styles.actionButton}
         />
+        {extraSubmitAction && (
+          <AppButton
+            title={extraSubmitAction.label}
+            variant="secondary"
+            onPress={() => handleSubmit(extraSubmitAction.onSubmit)}
+            disabled={extraSubmitAction.disabled}
+            style={styles.actionButton}
+          />
+        )}
         {secondaryAction && (
           <AppButton
             title={secondaryAction.label}
