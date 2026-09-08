@@ -25,7 +25,8 @@ describe('mapOffProductToFood', () => {
     expect(food.brand).toBe('Fage');
     expect(food.barcode).toBe('0123456789012');
     expect(food.source).toBe('open_food_facts');
-    expect(food.basisType).toBe('per_100g');
+    expect(food.servingAmount).toBe(100);
+    expect(food.servingUnit).toBe('g');
     expect(food.calories).toBe(97);
     expect(food.proteinG).toBe(9);
     expect(food.sodiumMg).toBeCloseTo(36);

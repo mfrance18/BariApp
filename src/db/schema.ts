@@ -16,14 +16,12 @@ export const foods = sqliteTable(
     source: text('source', { enum: ['manual', 'open_food_facts'] })
       .notNull()
       .default('manual'),
-    basisType: text('basis_type', { enum: ['per_100g', 'per_serving'] })
-      .notNull()
-      .default('per_100g'),
-    servingSizeG: real('serving_size_g'),
-    servingSizeUnit: text('serving_size_unit', { enum: ['g', 'oz'] })
-      .notNull()
-      .default('g'),
-    servingLabel: text('serving_label'),
+    // Nutrition values below are "per servingAmount servingUnit" (e.g. per
+    // 100 g, or per 1 bottle). Whether logging this food weighs it or just
+    // counts servings is inferred from whether servingUnit resolves to a
+    // weight/volume unit — see src/utils/servingUnits.ts.
+    servingAmount: real('serving_amount').notNull().default(1),
+    servingUnit: text('serving_unit').notNull().default('g'),
     calories: real('calories').notNull().default(0),
     proteinG: real('protein_g').notNull().default(0),
     carbsG: real('carbs_g').notNull().default(0),
@@ -76,7 +74,13 @@ export const mealLogEntries = sqliteTable(
     itemType: text('item_type', { enum: ['food', 'recipe'] }).notNull(),
     foodId: integer('food_id').references(() => foods.id),
     recipeId: integer('recipe_id').references(() => recipes.id),
-    weightG: real('weight_g').notNull(),
+    // Exactly one of (weightG) or (quantityAmount + quantityUnit) is set,
+    // depending on whether the food's serving unit was weighable at log
+    // time (see src/utils/servingUnits.ts) — a discrete unit like "bottle"
+    // or "scoop" has no gram equivalent, so it's logged as a count instead.
+    weightG: real('weight_g'),
+    quantityAmount: real('quantity_amount'),
+    quantityUnit: text('quantity_unit'),
     weightSource: text('weight_source', { enum: ['vesync_scale', 'manual'] }).notNull(),
     calories: real('calories').notNull(),
     proteinG: real('protein_g').notNull(),

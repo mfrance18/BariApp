@@ -10,6 +10,8 @@ function makeEntry(overrides: Partial<MealLogEntryWithName>): MealLogEntryWithNa
     foodId: 1,
     recipeId: null,
     weightG: 100,
+    quantityAmount: null,
+    quantityUnit: null,
     weightSource: 'manual',
     calories: 100,
     proteinG: 10,

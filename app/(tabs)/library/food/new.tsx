@@ -15,6 +15,8 @@ export default function NewFoodScreen() {
     barcode: params.barcode ?? '',
     name: params.name ?? '',
     brand: params.brand ?? '',
+    servingAmount: params.servingAmount ?? EMPTY_FOOD_FORM_VALUES.servingAmount,
+    servingUnit: params.servingUnit ?? EMPTY_FOOD_FORM_VALUES.servingUnit,
     calories: params.calories ?? '',
     proteinG: params.proteinG ?? '',
     carbsG: params.carbsG ?? '',

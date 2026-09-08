@@ -83,7 +83,7 @@ export default function LibraryScreen() {
               <View style={styles.rowTextGroup}>
                 <Text style={styles.rowTitle}>{item.name}</Text>
                 <Text style={styles.rowSubtitle}>
-                  {item.calories} kcal / {item.basisType === 'per_100g' ? '100g' : item.servingLabel ?? 'serving'}
+                  {item.calories} kcal / {item.servingAmount} {item.servingUnit}
                 </Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />

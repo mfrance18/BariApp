@@ -105,7 +105,7 @@ export default function PickItemScreen() {
               <View style={styles.rowTextGroup}>
                 <Text style={styles.rowTitle}>{item.name}</Text>
                 <Text style={styles.rowSubtitle}>
-                  {item.calories} kcal / {item.basisType === 'per_100g' ? '100g' : item.servingLabel ?? 'serving'}
+                  {item.calories} kcal / {item.servingAmount} {item.servingUnit}
                 </Text>
               </View>
               <Ionicons name="add-circle" size={22} color={colors.primary} />

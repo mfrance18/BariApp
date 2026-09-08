@@ -22,6 +22,7 @@ import type { MealType } from '../../../src/services/nutrition/totals';
 import { getLatestWeight } from '../../../src/services/vesync/adapter';
 import { colors, radius, spacing, typography } from '../../../src/theme/theme';
 import { todayLogDateKey } from '../../../src/utils/date';
+import { isWeighableUnit } from '../../../src/utils/servingUnits';
 
 const NUTRIENT_COLORS: Record<string, string> = {
   Calories: colors.primary,
@@ -84,17 +85,17 @@ export default function WeighScreen() {
     enabled: itemType === 'recipe',
   });
 
-  const isServingBased = itemType === 'food' && foodQuery.data?.basisType === 'per_serving';
+  const isCountBased = itemType === 'food' && !!foodQuery.data && !isWeighableUnit(foodQuery.data.servingUnit);
 
   useEffect(() => {
     if (!existingEntryQuery.data) return;
     setWeightSource(existingEntryQuery.data.weightSource);
-    if (isServingBased && foodQuery.data?.servingSizeG) {
-      setServingsInput(String(existingEntryQuery.data.weightG / foodQuery.data.servingSizeG));
-    } else {
+    if (existingEntryQuery.data.quantityAmount != null) {
+      setServingsInput(String(existingEntryQuery.data.quantityAmount));
+    } else if (existingEntryQuery.data.weightG != null) {
       setWeightG(String(existingEntryQuery.data.weightG));
     }
-  }, [existingEntryQuery.data, isServingBased, foodQuery.data?.servingSizeG]);
+  }, [existingEntryQuery.data]);
 
   const itemName = itemType === 'food' ? foodQuery.data?.name : recipeQuery.data?.name;
   const isLoading =
@@ -103,17 +104,18 @@ export default function WeighScreen() {
   const itemNotFound =
     !isLoading && (itemType === 'food' ? foodQuery.data === null : recipeQuery.data === null);
 
-  const measuredWeightG = isServingBased
-    ? Number(servingsInput) * (foodQuery.data?.servingSizeG ?? 0)
-    : Number(weightG);
+  // For count-based foods there's no gram amount at all — nutrition is
+  // simply the food's per-serving values times how many servings, using
+  // scaleNutrition with a reference of "1 serving".
+  const measuredAmount = isCountBased ? Number(servingsInput) : Number(weightG);
 
   const preview: NutritionFields | null = useMemo(() => {
-    if (!measuredWeightG || measuredWeightG <= 0) return null;
+    if (!measuredAmount || measuredAmount <= 0) return null;
 
     try {
       if (itemType === 'food' && foodQuery.data) {
-        const referenceWeightG = getReferenceWeightG(foodQuery.data);
-        return roundNutritionForDisplay(scaleNutrition(foodQuery.data, referenceWeightG, measuredWeightG));
+        const referenceAmount = isCountBased ? 1 : getReferenceWeightG(foodQuery.data);
+        return roundNutritionForDisplay(scaleNutrition(foodQuery.data, referenceAmount, measuredAmount));
       }
       if (itemType === 'recipe' && recipeQuery.data) {
         const recipeTotals = computeRecipeTotals(
@@ -122,23 +124,27 @@ export default function WeighScreen() {
             quantityG: ingredient.quantityG,
           })),
         );
-        return roundNutritionForDisplay(scaleRecipePortion(recipeTotals, measuredWeightG));
+        return roundNutritionForDisplay(scaleRecipePortion(recipeTotals, measuredAmount));
       }
     } catch {
       return null;
     }
     return null;
-  }, [measuredWeightG, itemType, foodQuery.data, recipeQuery.data]);
+  }, [measuredAmount, isCountBased, itemType, foodQuery.data, recipeQuery.data]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const weight = measuredWeightG;
-      if (!weight || weight <= 0) throw new Error(isServingBased ? 'Enter how many servings' : 'Enter a weight greater than 0');
+      const amount = measuredAmount;
+      if (!amount || amount <= 0) throw new Error(isCountBased ? 'Enter how many servings' : 'Enter a weight greater than 0');
       const nutrition = preview;
       if (!nutrition) throw new Error('Unable to compute nutrition for this amount');
 
+      const amountFields = isCountBased
+        ? { weightG: null, quantityAmount: amount, quantityUnit: foodQuery.data!.servingUnit }
+        : { weightG: amount, quantityAmount: null, quantityUnit: null };
+
       if (isEditing) {
-        return updateEntry(Number(entryId), { weightG: weight, weightSource, ...nutrition });
+        return updateEntry(Number(entryId), { ...amountFields, weightSource, ...nutrition });
       }
 
       const entry: Omit<NewMealLogEntry, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -147,7 +153,7 @@ export default function WeighScreen() {
         itemType,
         foodId: itemType === 'food' ? id : null,
         recipeId: itemType === 'recipe' ? id : null,
-        weightG: weight,
+        ...amountFields,
         weightSource,
         loggedAt: new Date().toISOString(),
         notes: null,
@@ -182,10 +188,10 @@ export default function WeighScreen() {
       <Text style={styles.itemName}>{itemName}</Text>
       <Text style={styles.mealLabel}>Logging to {mealType}</Text>
 
-      {isServingBased ? (
+      {isCountBased ? (
         <Card style={styles.field}>
           <Text style={styles.fieldLabel}>
-            Servings {foodQuery.data?.servingLabel ? `(1 = ${foodQuery.data.servingLabel})` : ''}
+            Servings {foodQuery.data ? `(1 = ${foodQuery.data.servingAmount} ${foodQuery.data.servingUnit})` : ''}
           </Text>
           <TextInput
             style={styles.input}

@@ -6,6 +6,7 @@ import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'r
 import { listFoods, type Food } from '../db/repositories/foodsRepo';
 import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
+import { isWeighableUnit } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
 
@@ -80,20 +81,29 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit }:
       .map((i) => ({ food: i.food, quantityG: Number(i.quantityG) }))
       .filter((i) => i.quantityG > 0);
     if (validIngredients.length === 0) return null;
-    const { totals, totalWeightG } = computeRecipeTotals(validIngredients);
-    const perServing = roundNutritionForDisplay({
-      calories: totals.calories / servingsNum,
-      proteinG: totals.proteinG / servingsNum,
-      carbsG: totals.carbsG / servingsNum,
-      fatG: totals.fatG / servingsNum,
-      fiberG: totals.fiberG / servingsNum,
-      sugarG: totals.sugarG / servingsNum,
-      sodiumMg: totals.sodiumMg / servingsNum,
-    });
-    return { totalWeightG, perServing };
+    try {
+      const { totals, totalWeightG } = computeRecipeTotals(validIngredients);
+      const perServing = roundNutritionForDisplay({
+        calories: totals.calories / servingsNum,
+        proteinG: totals.proteinG / servingsNum,
+        carbsG: totals.carbsG / servingsNum,
+        fatG: totals.fatG / servingsNum,
+        fiberG: totals.fiberG / servingsNum,
+        sugarG: totals.sugarG / servingsNum,
+        sodiumMg: totals.sodiumMg / servingsNum,
+      });
+      return { totalWeightG, perServing };
+    } catch {
+      return null;
+    }
   }, [ingredients, servings]);
 
   function addIngredient(food: Food) {
+    if (!isWeighableUnit(food.servingUnit)) {
+      setError(`${food.name} is logged as "${food.servingAmount} ${food.servingUnit}", not a weight, so it can't be used in a recipe.`);
+      return;
+    }
+    setError(null);
     setIngredients((prev) => [...prev, { food, quantityG: '100' }]);
     setSearchText('');
   }

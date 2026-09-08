@@ -6,21 +6,14 @@ import { AppButton } from '../../../../src/components/ui/AppButton';
 import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../../../src/components/FoodForm';
 import { archiveFood, getFoodById, updateFood, type Food } from '../../../../src/db/repositories/foodsRepo';
 import { colors } from '../../../../src/theme/theme';
-import { mlToOz } from '../../../../src/utils/units';
 
 function foodToFormValues(food: Food): FoodFormValues {
-  const servingSize =
-    food.servingSizeG == null
-      ? ''
-      : String(food.servingSizeUnit === 'oz' ? mlToOz(food.servingSizeG) : food.servingSizeG);
   return {
     name: food.name,
     brand: food.brand ?? '',
     barcode: food.barcode ?? '',
-    basisType: food.basisType,
-    servingSize,
-    servingSizeUnit: food.servingSizeUnit,
-    servingLabel: food.servingLabel ?? '',
+    servingAmount: String(food.servingAmount),
+    servingUnit: food.servingUnit,
     calories: String(food.calories),
     proteinG: String(food.proteinG),
     carbsG: String(food.carbsG),

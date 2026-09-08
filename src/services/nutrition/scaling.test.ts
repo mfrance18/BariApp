@@ -9,8 +9,8 @@ import {
 } from './scaling';
 
 const chickenBreastPer100g = {
-  basisType: 'per_100g' as const,
-  servingSizeG: null,
+  servingAmount: 100,
+  servingUnit: 'g',
   calories: 165,
   proteinG: 31,
   carbsG: 0,
@@ -21,8 +21,8 @@ const chickenBreastPer100g = {
 };
 
 const proteinBarPerServing = {
-  basisType: 'per_serving' as const,
-  servingSizeG: 60,
+  servingAmount: 60,
+  servingUnit: 'g',
   calories: 200,
   proteinG: 20,
   carbsG: 22,
@@ -33,20 +33,20 @@ const proteinBarPerServing = {
 };
 
 describe('getReferenceWeightG', () => {
-  it('returns 100 for per_100g foods', () => {
+  it('returns 100 for a food defined per 100 g', () => {
     expect(getReferenceWeightG(chickenBreastPer100g)).toBe(100);
   });
 
-  it('returns servingSizeG for per_serving foods', () => {
+  it('returns servingAmount for a food defined per a smaller gram amount', () => {
     expect(getReferenceWeightG(proteinBarPerServing)).toBe(60);
   });
 
-  it('throws for a per_serving food with no serving size', () => {
-    expect(() => getReferenceWeightG({ basisType: 'per_serving', servingSizeG: null })).toThrow();
+  it('converts a non-gram weight unit to grams', () => {
+    expect(getReferenceWeightG({ servingAmount: 1, servingUnit: 'oz' })).toBeCloseTo(29.5735);
   });
 
-  it('throws for a per_serving food with a zero serving size', () => {
-    expect(() => getReferenceWeightG({ basisType: 'per_serving', servingSizeG: 0 })).toThrow();
+  it('throws for a discrete, non-weighable unit', () => {
+    expect(() => getReferenceWeightG({ servingAmount: 1, servingUnit: 'bottle' })).toThrow();
   });
 });
 

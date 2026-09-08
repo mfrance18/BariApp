@@ -1,3 +1,5 @@
+import { servingToGrams } from '../../utils/servingUnits';
+
 export interface NutritionFields {
   calories: number;
   proteinG: number;
@@ -21,17 +23,23 @@ export const ZERO_NUTRITION: NutritionFields = {
 const NUTRITION_KEYS = Object.keys(ZERO_NUTRITION) as (keyof NutritionFields)[];
 
 export interface FoodBasis {
-  basisType: 'per_100g' | 'per_serving';
-  servingSizeG: number | null;
+  servingAmount: number;
+  servingUnit: string;
 }
 
-/** The weight (in grams) that a food's stored nutrition values are relative to. */
+/**
+ * The weight (in grams) that a food's stored nutrition values are relative
+ * to — only defined when servingUnit resolves to a weight/volume unit (see
+ * src/utils/servingUnits.ts). Foods with a discrete unit (e.g. "bottle",
+ * "scoop") aren't weighable and can't be used where a gram reference is
+ * required (recipes, scale-based logging).
+ */
 export function getReferenceWeightG(food: FoodBasis): number {
-  if (food.basisType === 'per_100g') return 100;
-  if (!food.servingSizeG || food.servingSizeG <= 0) {
-    throw new Error('per_serving foods must have a positive serving_size_g');
+  const grams = servingToGrams(food.servingAmount, food.servingUnit);
+  if (grams == null || grams <= 0) {
+    throw new Error(`"${food.servingUnit}" isn't a weighable unit`);
   }
-  return food.servingSizeG;
+  return grams;
 }
 
 /** Scales a nutrition basis (per referenceWeightG) to the measured weight. */

@@ -56,6 +56,8 @@ export default function ScanBarcodeScreen() {
         barcode,
         name: food.name,
         brand: food.brand ?? '',
+        servingAmount: String(food.servingAmount),
+        servingUnit: food.servingUnit,
         calories: String(food.calories),
         proteinG: String(food.proteinG),
         carbsG: String(food.carbsG),

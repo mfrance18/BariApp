@@ -15,6 +15,20 @@
       "when": 1788828256639,
       "tag": "0001_aromatic_the_watchers",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1788831000000,
+      "tag": "0002_serving_amount_unit",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1788831500000,
+      "tag": "0003_meal_log_quantity",
+      "breakpoints": true
     }
   ]
 }

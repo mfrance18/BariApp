@@ -275,7 +275,8 @@ function MealSection({
             >
               <Text style={styles.entryName}>{entry.itemName}</Text>
               <Text style={styles.entrySubtext}>
-                {entry.weightG} g · {Math.round(entry.calories)} kcal
+                {entry.weightG != null ? `${entry.weightG} g` : `${entry.quantityAmount} ${entry.quantityUnit}`} ·{' '}
+                {Math.round(entry.calories)} kcal
               </Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => onDelete(entry.id)} hitSlop={8}>
