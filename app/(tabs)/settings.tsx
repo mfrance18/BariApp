@@ -4,6 +4,7 @@ import { ActivityIndicator, Button, ScrollView, StyleSheet, Text, TextInput, Vie
 
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { login, logout, syncWeightHistoryToDb } from '../../src/services/vesync/adapter';
+import { mlToOz } from '../../src/utils/units';
 
 export default function SettingsScreen() {
   const queryClient = useQueryClient();
@@ -92,7 +93,7 @@ export default function SettingsScreen() {
       <Section title="Daily Goals">
         <Text style={styles.rowText}>Calories: {settings.dailyCalorieGoal}</Text>
         <Text style={styles.rowText}>Protein: {settings.dailyProteinGoalG} g</Text>
-        <Text style={styles.rowText}>Fluid: {settings.dailyFluidGoalMl} mL</Text>
+        <Text style={styles.rowText}>Fluid: {mlToOz(settings.dailyFluidGoalMl).toFixed(0)} oz</Text>
       </Section>
       <Section title="Units">
         <Text style={styles.rowText}>Weight unit: {settings.weightUnit}</Text>

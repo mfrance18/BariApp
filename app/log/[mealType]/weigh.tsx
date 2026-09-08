@@ -30,6 +30,7 @@ export default function WeighScreen() {
   }>();
   const queryClient = useQueryClient();
   const [weightG, setWeightG] = useState('');
+  const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
   const [scaleError, setScaleError] = useState<string | null>(null);
 
@@ -42,13 +43,6 @@ export default function WeighScreen() {
     queryFn: () => getEntryById(Number(entryId)),
     enabled: isEditing,
   });
-
-  useEffect(() => {
-    if (existingEntryQuery.data) {
-      setWeightG(String(existingEntryQuery.data.weightG));
-      setWeightSource(existingEntryQuery.data.weightSource);
-    }
-  }, [existingEntryQuery.data]);
 
   const settingsQuery = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
 
@@ -77,6 +71,18 @@ export default function WeighScreen() {
     enabled: itemType === 'recipe',
   });
 
+  const isServingBased = itemType === 'food' && foodQuery.data?.basisType === 'per_serving';
+
+  useEffect(() => {
+    if (!existingEntryQuery.data) return;
+    setWeightSource(existingEntryQuery.data.weightSource);
+    if (isServingBased && foodQuery.data?.servingSizeG) {
+      setServingsInput(String(existingEntryQuery.data.weightG / foodQuery.data.servingSizeG));
+    } else {
+      setWeightG(String(existingEntryQuery.data.weightG));
+    }
+  }, [existingEntryQuery.data, isServingBased, foodQuery.data?.servingSizeG]);
+
   const itemName = itemType === 'food' ? foodQuery.data?.name : recipeQuery.data?.name;
   const isLoading =
     (itemType === 'food' ? foodQuery.isLoading : recipeQuery.isLoading) ||
@@ -84,14 +90,17 @@ export default function WeighScreen() {
   const itemNotFound =
     !isLoading && (itemType === 'food' ? foodQuery.data === null : recipeQuery.data === null);
 
+  const measuredWeightG = isServingBased
+    ? Number(servingsInput) * (foodQuery.data?.servingSizeG ?? 0)
+    : Number(weightG);
+
   const preview: NutritionFields | null = useMemo(() => {
-    const weight = Number(weightG);
-    if (!weight || weight <= 0) return null;
+    if (!measuredWeightG || measuredWeightG <= 0) return null;
 
     try {
       if (itemType === 'food' && foodQuery.data) {
         const referenceWeightG = getReferenceWeightG(foodQuery.data);
-        return roundNutritionForDisplay(scaleNutrition(foodQuery.data, referenceWeightG, weight));
+        return roundNutritionForDisplay(scaleNutrition(foodQuery.data, referenceWeightG, measuredWeightG));
       }
       if (itemType === 'recipe' && recipeQuery.data) {
         const recipeTotals = computeRecipeTotals(
@@ -100,20 +109,20 @@ export default function WeighScreen() {
             quantityG: ingredient.quantityG,
           })),
         );
-        return roundNutritionForDisplay(scaleRecipePortion(recipeTotals, weight));
+        return roundNutritionForDisplay(scaleRecipePortion(recipeTotals, measuredWeightG));
       }
     } catch {
       return null;
     }
     return null;
-  }, [weightG, itemType, foodQuery.data, recipeQuery.data]);
+  }, [measuredWeightG, itemType, foodQuery.data, recipeQuery.data]);
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const weight = Number(weightG);
-      if (!weight || weight <= 0) throw new Error('Enter a weight greater than 0');
+      const weight = measuredWeightG;
+      if (!weight || weight <= 0) throw new Error(isServingBased ? 'Enter how many servings' : 'Enter a weight greater than 0');
       const nutrition = preview;
-      if (!nutrition) throw new Error('Unable to compute nutrition for this weight');
+      if (!nutrition) throw new Error('Unable to compute nutrition for this amount');
 
       if (isEditing) {
         return updateEntry(Number(entryId), { weightG: weight, weightSource, ...nutrition });
@@ -160,29 +169,46 @@ export default function WeighScreen() {
       <Text style={styles.itemName}>{itemName}</Text>
       <Text style={styles.mealLabel}>Logging to {mealType}</Text>
 
-      <View style={styles.field}>
-        <Text style={styles.fieldLabel}>Weight (g)</Text>
-        <TextInput
-          style={styles.input}
-          value={weightG}
-          onChangeText={(v) => {
-            setWeightG(v);
-            setWeightSource('manual');
-          }}
-          keyboardType="decimal-pad"
-          placeholder="e.g. 120"
-          autoFocus
-        />
-        {settingsQuery.data?.vesyncConnected && (
-          <Button
-            title={pullFromScaleMutation.isPending ? 'Reading scale…' : 'Pull from Scale'}
-            onPress={() => pullFromScaleMutation.mutate()}
-            disabled={pullFromScaleMutation.isPending}
+      {isServingBased ? (
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>
+            Servings {foodQuery.data?.servingLabel ? `(1 = ${foodQuery.data.servingLabel})` : ''}
+          </Text>
+          <TextInput
+            style={styles.input}
+            value={servingsInput}
+            onChangeText={setServingsInput}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 1"
+            autoFocus
+            selectTextOnFocus
           />
-        )}
-        {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
-        {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
-      </View>
+        </View>
+      ) : (
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Weight (g)</Text>
+          <TextInput
+            style={styles.input}
+            value={weightG}
+            onChangeText={(v) => {
+              setWeightG(v);
+              setWeightSource('manual');
+            }}
+            keyboardType="decimal-pad"
+            placeholder="e.g. 120"
+            autoFocus
+          />
+          {settingsQuery.data?.vesyncConnected && (
+            <Button
+              title={pullFromScaleMutation.isPending ? 'Reading scale…' : 'Pull from Scale'}
+              onPress={() => pullFromScaleMutation.mutate()}
+              disabled={pullFromScaleMutation.isPending}
+            />
+          )}
+          {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
+          {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
+        </View>
+      )}
 
       <View style={styles.previewBox}>
         <NutritionRow label="Calories" value={(preview ?? ZERO_NUTRITION).calories} unit="kcal" />

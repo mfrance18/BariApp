@@ -9,6 +9,7 @@ import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { formatDisplayDate, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
+import { mlToOz } from '../../src/utils/units';
 
 const KG_TO_LB = 2.20462;
 
@@ -94,7 +95,9 @@ export default function DashboardScreen() {
             style={styles.fluidStrip}
             onPress={() => router.push('/fluids')}
           >
-            <Text style={styles.fluidStripText}>💧 {fluidTotalMl} / {fluidGoalMl} mL</Text>
+            <Text style={styles.fluidStripText}>
+              💧 {mlToOz(fluidTotalMl).toFixed(1)} / {mlToOz(fluidGoalMl).toFixed(1)} oz
+            </Text>
           </TouchableOpacity>
           {latestWeight && (
             <TouchableOpacity style={styles.weightCard} onPress={() => router.push('/weight-history')}>

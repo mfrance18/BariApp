@@ -5,8 +5,13 @@ import { Button, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View }
 import { createEntry, deleteEntry, listEntriesForDate, type FluidLogEntry } from '../../src/db/repositories/fluidRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { todayLogDateKey } from '../../src/utils/date';
+import { mlToOz, ozToMl } from '../../src/utils/units';
 
-const QUICK_ADD_ML = [60, 120, 250, 500];
+const CUPS_OZ = [4, 8, 12, 16, 20];
+
+function formatOz(oz: number): string {
+  return Number.isInteger(oz) ? String(oz) : oz.toFixed(1);
+}
 
 export default function FluidsScreen() {
   const queryClient = useQueryClient();
@@ -20,7 +25,7 @@ export default function FluidsScreen() {
   });
 
   const addMutation = useMutation({
-    mutationFn: (amountMl: number) => createEntry(amountMl),
+    mutationFn: (amountOz: number) => createEntry(ozToMl(amountOz)),
     onSuccess: () => {
       setCustomAmount('');
       queryClient.invalidateQueries({ queryKey: ['fluidLog', logDate] });
@@ -32,9 +37,9 @@ export default function FluidsScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fluidLog', logDate] }),
   });
 
-  const totalMl = (entries ?? []).reduce((sum, e) => sum + e.amountMl, 0);
-  const goalMl = settings?.dailyFluidGoalMl ?? 1500;
-  const progress = Math.min(1, totalMl / goalMl);
+  const totalOz = mlToOz((entries ?? []).reduce((sum, e) => sum + e.amountMl, 0));
+  const goalOz = mlToOz(settings?.dailyFluidGoalMl ?? 1500);
+  const progress = Math.min(1, totalOz / goalOz);
 
   return (
     <FlatList
@@ -47,21 +52,18 @@ export default function FluidsScreen() {
           <Text style={styles.heading}>Today&apos;s Fluids</Text>
           <View style={styles.progressBox}>
             <Text style={styles.progressText}>
-              {totalMl} / {goalMl} mL
+              {formatOz(totalOz)} / {formatOz(goalOz)} oz
             </Text>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
             </View>
           </View>
 
+          <Text style={styles.sectionLabel}>Cups</Text>
           <View style={styles.quickAddRow}>
-            {QUICK_ADD_ML.map((amount) => (
-              <TouchableOpacity
-                key={amount}
-                style={styles.quickAddButton}
-                onPress={() => addMutation.mutate(amount)}
-              >
-                <Text style={styles.quickAddButtonText}>+{amount} mL</Text>
+            {CUPS_OZ.map((oz) => (
+              <TouchableOpacity key={oz} style={styles.quickAddButton} onPress={() => addMutation.mutate(oz)}>
+                <Text style={styles.quickAddButtonText}>{oz} oz</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -69,8 +71,8 @@ export default function FluidsScreen() {
           <View style={styles.customRow}>
             <TextInput
               style={styles.input}
-              placeholder="Custom amount (mL)"
-              keyboardType="number-pad"
+              placeholder="Custom amount (oz)"
+              keyboardType="decimal-pad"
               value={customAmount}
               onChangeText={setCustomAmount}
             />
@@ -94,7 +96,8 @@ function FluidRow({ entry, onDelete }: { entry: FluidLogEntry; onDelete: () => v
   return (
     <View style={styles.row}>
       <Text style={styles.rowText}>
-        {entry.amountMl} mL · {new Date(entry.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        {formatOz(mlToOz(entry.amountMl))} oz ·{' '}
+        {new Date(entry.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
       </Text>
       <Text style={styles.removeLink} onPress={onDelete}>
         Remove
@@ -136,6 +139,11 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#0ea5e9',
   },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#555',
+  },
   quickAddRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -144,8 +152,8 @@ const styles = StyleSheet.create({
   quickAddButton: {
     backgroundColor: '#e0f2fe',
     borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   quickAddButtonText: {
     color: '#0369a1',
