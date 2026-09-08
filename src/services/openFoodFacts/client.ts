@@ -23,25 +23,28 @@ export async function getProductByBarcode(barcode: string): Promise<OffProduct |
   }
 }
 
-/** Searches products by name (free-text). Returns [] if nothing matches or on any network/parse error. */
+/**
+ * Searches products by name (free-text). Returns [] only when the search
+ * genuinely found nothing — network/parse failures throw instead of being
+ * swallowed, so a caller (e.g. a react-query queryFn) can tell "no matches"
+ * apart from "the request failed" rather than showing both identically.
+ */
 export async function searchProductsByName(query: string, limit = 15): Promise<OffProduct[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
-  try {
-    const params = new URLSearchParams({
-      search_terms: trimmed,
-      search_simple: '1',
-      action: 'process',
-      json: '1',
-      sort_by: 'unique_scans_n',
-      fields: FIELDS,
-      page_size: String(limit),
-    });
-    const response = await fetch(`${DOMAIN}/cgi/search.pl?${params.toString()}`);
-    if (!response.ok) return [];
-    const data = (await response.json()) as OffSearchResponse;
-    return (data.products ?? []).filter((p) => p.code && p.product_name);
-  } catch {
-    return [];
+  const params = new URLSearchParams({
+    search_terms: trimmed,
+    search_simple: '1',
+    action: 'process',
+    json: '1',
+    sort_by: 'unique_scans_n',
+    fields: FIELDS,
+    page_size: String(limit),
+  });
+  const response = await fetch(`${DOMAIN}/cgi/search.pl?${params.toString()}`);
+  if (!response.ok) {
+    throw new Error(`Open Food Facts search failed (${response.status})`);
   }
+  const data = (await response.json()) as OffSearchResponse;
+  return (data.products ?? []).filter((p) => p.code && p.product_name);
 }

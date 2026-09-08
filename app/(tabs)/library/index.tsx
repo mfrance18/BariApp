@@ -121,7 +121,13 @@ export default function LibraryScreen() {
           ListFooterComponent={
             showOffSearch ? (
               <View style={styles.offSection}>
-                <OffFoodResults results={offSearch.results} loading={offSearch.loading} context={{ destination: '/food/new' }} />
+                <OffFoodResults
+                  results={offSearch.results}
+                  loading={offSearch.loading}
+                  error={offSearch.error}
+                  onRetry={offSearch.retry}
+                  context={{ destination: '/food/new' }}
+                />
               </View>
             ) : null
           }

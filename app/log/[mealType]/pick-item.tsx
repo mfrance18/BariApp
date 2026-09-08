@@ -144,6 +144,8 @@ export default function PickItemScreen() {
                 <OffFoodResults
                   results={offSearch.results}
                   loading={offSearch.loading}
+                  error={offSearch.error}
+                  onRetry={offSearch.retry}
                   context={{ destination: '/food/new', logMealType: mealType, logDate: effectiveLogDate }}
                 />
               </View>

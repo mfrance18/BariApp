@@ -12,10 +12,13 @@ export function useOffFoodSearch(query: string, enabled: boolean) {
     queryKey: ['off', 'search', debounced],
     queryFn: () => searchProductsByName(debounced),
     enabled: active,
+    retry: 1,
   });
 
   return {
     results: offQuery.data ?? [],
     loading: active && offQuery.isFetching,
+    error: active && offQuery.isError ? (offQuery.error as Error) : null,
+    retry: offQuery.refetch,
   };
 }

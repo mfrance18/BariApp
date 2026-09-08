@@ -3,15 +3,18 @@ import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { navigateToExistingFoodByBarcode, navigateToPrefilledFoodForm, type FoodMatchContext } from '../services/openFoodFacts/navigation';
 import type { OffProduct } from '../services/openFoodFacts/types';
 import { colors, radius, spacing, typography } from '../theme/theme';
+import { AppButton } from './ui/AppButton';
 
 interface OffFoodResultsProps {
   results: OffProduct[];
   loading: boolean;
+  error?: Error | null;
+  onRetry?: () => void;
   context: FoodMatchContext;
 }
 
 /** Lets the user search Open Food Facts and pick a match, alongside whatever's already in the local library. */
-export function OffFoodResults({ results, loading, context }: OffFoodResultsProps) {
+export function OffFoodResults({ results, loading, error, onRetry, context }: OffFoodResultsProps) {
   async function handlePress(product: OffProduct) {
     const handledExisting = await navigateToExistingFoodByBarcode(product.code, context);
     if (!handledExisting) {
@@ -26,6 +29,16 @@ export function OffFoodResults({ results, loading, context }: OffFoodResultsProp
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
+        <Text style={styles.emptyText}>Couldn't reach Open Food Facts: {error.message}</Text>
+        {onRetry && <AppButton title="Retry" variant="secondary" onPress={onRetry} />}
       </View>
     );
   }
