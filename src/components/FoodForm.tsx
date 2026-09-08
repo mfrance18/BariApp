@@ -161,7 +161,7 @@ export function FoodForm({
   return (
     <KeyboardAwareScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+      contentContainerStyle={StyleSheet.flatten([styles.content, { paddingBottom: 24 + insets.bottom }])}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
       extraScrollHeight={24}

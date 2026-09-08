@@ -51,7 +51,7 @@ export default function SettingsScreen() {
   return (
     <KeyboardAwareScrollView
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={StyleSheet.flatten(styles.content)}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
       extraScrollHeight={24}
