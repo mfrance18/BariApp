@@ -150,11 +150,7 @@ export default function DashboardScreen() {
               </Card>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.statCardWrapper}
-              onPress={() => router.push('/weight-history')}
-              disabled={!latestWeight}
-            >
+            <TouchableOpacity style={styles.statCardWrapper} onPress={() => router.push('/weight-history')}>
               <Card style={styles.statCard}>
                 <Ionicons name="trending-down" size={20} color={colors.weight} />
                 {latestWeight ? (
@@ -170,7 +166,7 @@ export default function DashboardScreen() {
                     </Text>
                   </>
                 ) : (
-                  <Text style={styles.statCardLabel}>No weigh-ins yet</Text>
+                  <Text style={styles.statCardLabel}>Tap to log your weight</Text>
                 )}
               </Card>
             </TouchableOpacity>
