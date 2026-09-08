@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,7 +10,7 @@ import { getProductByBarcode } from '../services/openFoodFacts/client';
 import { mapOffProductToFood } from '../services/openFoodFacts/mapper';
 import type { OffProduct } from '../services/openFoodFacts/types';
 import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
-import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
+import { computeRecipeTotals, getReferenceWeightG, roundNutritionForDisplay, scaleNutrition } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
@@ -38,16 +38,25 @@ const EMPTY_NUTRITION_DRAFT: NutritionDraft = {
   sodiumMg: '',
 };
 
-function nutritionDraftFromFood(food: Food): NutritionDraft {
-  return {
-    calories: String(food.calories),
-    proteinG: String(food.proteinG),
-    carbsG: String(food.carbsG),
-    fatG: String(food.fatG),
-    fiberG: String(food.fiberG),
-    sugarG: String(food.sugarG),
-    sodiumMg: String(food.sodiumMg),
-  };
+/** Nutrition contributed by `amount unit` of `food`, scaled from its stored per-serving basis, or null if the quantity can't be resolved to a weight. */
+function nutritionDraftForQuantity(food: Food, amount: number, unit: string): NutritionDraft | null {
+  const targetGrams = servingToGrams(amount, unit);
+  if (targetGrams == null || targetGrams <= 0) return null;
+  try {
+    const referenceWeightG = getReferenceWeightG(food);
+    const scaled = roundNutritionForDisplay(scaleNutrition(food, referenceWeightG, targetGrams));
+    return {
+      calories: String(scaled.calories),
+      proteinG: String(scaled.proteinG),
+      carbsG: String(scaled.carbsG),
+      fatG: String(scaled.fatG),
+      fiberG: String(scaled.fiberG),
+      sugarG: String(scaled.sugarG),
+      sodiumMg: String(scaled.sodiumMg),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export interface RecipeIngredientDraft {
@@ -184,17 +193,32 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     }
     setError(null);
     setQuantityError(null);
+    let defaultAmount: number;
+    let defaultUnit: string;
     if (isWeighableUnit(food.servingUnit)) {
-      setQuantityAmount(String(food.servingAmount));
-      setQuantityUnit(food.servingUnit);
+      defaultAmount = food.servingAmount;
+      defaultUnit = food.servingUnit;
     } else {
-      setQuantityAmount(food.servingWeightG != null ? String(food.servingWeightG) : '');
-      setQuantityUnit('g');
+      defaultAmount = food.servingWeightG ?? 0;
+      defaultUnit = 'g';
     }
-    setNutritionDraft(nutritionDraftFromFood(food));
+    setQuantityAmount(defaultAmount ? String(defaultAmount) : '');
+    setQuantityUnit(defaultUnit);
+    setNutritionDraft(nutritionDraftForQuantity(food, defaultAmount, defaultUnit) ?? EMPTY_NUTRITION_DRAFT);
     setPendingIngredient(food);
     return null;
   }
+
+  // Recalculates the nutrition preview whenever the entered amount/unit
+  // changes, so it always reflects the current quantity — any nutrition
+  // field the user hand-edited resets along with it.
+  useEffect(() => {
+    if (!pendingIngredient) return;
+    const amount = Number(quantityAmount);
+    if (!amount || amount <= 0) return;
+    const recalculated = nutritionDraftForQuantity(pendingIngredient, amount, quantityUnit.trim() || 'g');
+    if (recalculated) setNutritionDraft(recalculated);
+  }, [quantityAmount, quantityUnit, pendingIngredient]);
 
   async function confirmAddIngredient() {
     if (!pendingIngredient) return;
@@ -204,13 +228,14 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       return;
     }
     const unit = quantityUnit.trim() || 'g';
-    if (servingToGrams(amount, unit) == null) {
+    const targetGrams = servingToGrams(amount, unit);
+    if (targetGrams == null) {
       setQuantityError(`"${unit}" isn't a recognized weight unit (try g, oz, lb, kg, ml)`);
       return;
     }
 
     const num = (s: string) => (s.trim() ? Number(s) : 0);
-    const editedNutrition = {
+    const enteredNutrition = {
       calories: num(nutritionDraft.calories),
       proteinG: num(nutritionDraft.proteinG),
       carbsG: num(nutritionDraft.carbsG),
@@ -219,24 +244,41 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       sugarG: num(nutritionDraft.sugarG),
       sodiumMg: num(nutritionDraft.sodiumMg),
     };
-    const nutritionChanged = (Object.keys(editedNutrition) as (keyof typeof editedNutrition)[]).some(
-      (key) => editedNutrition[key] !== pendingIngredient[key],
-    );
 
     let food = pendingIngredient;
-    if (nutritionChanged) {
-      setSavingIngredient(true);
-      try {
-        await updateFood(pendingIngredient.id, editedNutrition);
-        food = { ...pendingIngredient, ...editedNutrition };
+    try {
+      const referenceWeightG = getReferenceWeightG(pendingIngredient);
+      const expectedForQuantity = roundNutritionForDisplay(
+        scaleNutrition(pendingIngredient, referenceWeightG, targetGrams),
+      );
+      const nutritionEdited = (Object.keys(enteredNutrition) as (keyof typeof enteredNutrition)[]).some(
+        (key) => Math.abs(enteredNutrition[key] - expectedForQuantity[key]) > 0.05,
+      );
+      if (nutritionEdited) {
+        // The fields show nutrition scaled to this quantity, but the food's
+        // library record stores nutrition per its own serving — reverse the
+        // scaling before persisting the edit.
+        const ratio = referenceWeightG / targetGrams;
+        const baseNutrition = roundNutritionForDisplay({
+          calories: enteredNutrition.calories * ratio,
+          proteinG: enteredNutrition.proteinG * ratio,
+          carbsG: enteredNutrition.carbsG * ratio,
+          fatG: enteredNutrition.fatG * ratio,
+          fiberG: enteredNutrition.fiberG * ratio,
+          sugarG: enteredNutrition.sugarG * ratio,
+          sodiumMg: enteredNutrition.sodiumMg * ratio,
+        });
+        setSavingIngredient(true);
+        await updateFood(pendingIngredient.id, baseNutrition);
+        food = { ...pendingIngredient, ...baseNutrition };
         queryClient.invalidateQueries({ queryKey: ['foods'] });
-      } catch (err) {
-        setQuantityError((err as Error).message);
-        setSavingIngredient(false);
-        return;
       }
+    } catch (err) {
+      setQuantityError((err as Error).message);
       setSavingIngredient(false);
+      return;
     }
+    setSavingIngredient(false);
 
     setIngredients((prev) => [...prev, { food, quantityAmount: String(amount), quantityUnit: unit }]);
     setSearchText('');
@@ -477,7 +519,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
             </View>
 
             <Text style={styles.sectionLabel}>
-              NUTRITION (PER {pendingIngredient?.servingAmount} {pendingIngredient?.servingUnit})
+              NUTRITION (FOR {quantityAmount || pendingIngredient?.servingAmount} {quantityUnit || pendingIngredient?.servingUnit})
             </Text>
             <Field
               label="Calories"
