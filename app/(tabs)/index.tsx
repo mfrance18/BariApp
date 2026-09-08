@@ -176,44 +176,6 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-          {medsChecklist && medsChecklist.length > 0 && (
-            <Card style={styles.medsCard}>
-              <View style={styles.medsHeaderRow}>
-                <Text style={styles.mealsHeading}>Vitamins &amp; Meds</Text>
-                <TouchableOpacity onPress={() => router.push('/meds')} hitSlop={8}>
-                  <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-              {medsChecklist.map((item) => (
-                <TouchableOpacity
-                  key={item.scheduleId}
-                  style={[styles.medRow, item.status === 'taken' && styles.medRowTaken]}
-                  onPress={() => toggleMedMutation.mutate(item)}
-                >
-                  <View style={styles.medRowIcon}>
-                    <Ionicons
-                      name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
-                      size={18}
-                      color={item.status === 'taken' ? colors.success : colors.primary}
-                    />
-                  </View>
-                  <View style={styles.medTextGroup}>
-                    <Text style={styles.medName}>{item.name}</Text>
-                    <Text style={styles.medMeta}>
-                      {item.dosageLabel ? `${item.dosageLabel} · ` : ''}
-                      {formatTimeOfDay(item.timeOfDay)}
-                    </Text>
-                  </View>
-                  {item.status === 'taken' ? (
-                    <Ionicons name="checkmark-circle" size={22} color={colors.success} />
-                  ) : (
-                    <View style={styles.medCheckCircle} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </Card>
-          )}
-
           <Text style={styles.mealsHeading}>Meals</Text>
         </View>
       }
@@ -225,6 +187,45 @@ export default function DashboardScreen() {
           onDelete={(id) => deleteMutation.mutate(id)}
         />
       )}
+      ListFooterComponent={
+        medsChecklist && medsChecklist.length > 0 ? (
+          <Card style={styles.medsCard}>
+            <View style={styles.medsHeaderRow}>
+              <Text style={styles.mealsHeading}>Vitamins &amp; Meds</Text>
+              <TouchableOpacity onPress={() => router.push('/meds')} hitSlop={8}>
+                <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+            {medsChecklist.map((item) => (
+              <TouchableOpacity
+                key={item.scheduleId}
+                style={[styles.medRow, item.status === 'taken' && styles.medRowTaken]}
+                onPress={() => toggleMedMutation.mutate(item)}
+              >
+                <View style={styles.medRowIcon}>
+                  <Ionicons
+                    name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
+                    size={18}
+                    color={item.status === 'taken' ? colors.success : colors.primary}
+                  />
+                </View>
+                <View style={styles.medTextGroup}>
+                  <Text style={styles.medName}>{item.name}</Text>
+                  <Text style={styles.medMeta}>
+                    {item.dosageLabel ? `${item.dosageLabel} · ` : ''}
+                    {formatTimeOfDay(item.timeOfDay)}
+                  </Text>
+                </View>
+                {item.status === 'taken' ? (
+                  <Ionicons name="checkmark-circle" size={22} color={colors.success} />
+                ) : (
+                  <View style={styles.medCheckCircle} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </Card>
+        ) : null
+      }
     />
   );
 }
