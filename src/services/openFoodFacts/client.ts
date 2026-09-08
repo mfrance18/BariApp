@@ -1,6 +1,6 @@
 import type { OffProduct, OffProductResponse, OffSearchResponse } from './types';
 
-const BASE_URL = 'https://world.openfoodfacts.org/api/v2';
+const DOMAIN = 'https://world.openfoodfacts.org';
 const FIELDS = [
   'code',
   'product_name',
@@ -13,7 +13,7 @@ const FIELDS = [
 /** Looks up a product by barcode. Returns null if not found or on any network/parse error. */
 export async function getProductByBarcode(barcode: string): Promise<OffProduct | null> {
   try {
-    const response = await fetch(`${BASE_URL}/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`);
+    const response = await fetch(`${DOMAIN}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`);
     if (!response.ok) return null;
     const data = (await response.json()) as OffProductResponse;
     if (data.status !== 1 || !data.product) return null;
@@ -23,17 +23,21 @@ export async function getProductByBarcode(barcode: string): Promise<OffProduct |
   }
 }
 
-/** Searches products by name. Returns [] if nothing matches or on any network/parse error. */
+/** Searches products by name (free-text). Returns [] if nothing matches or on any network/parse error. */
 export async function searchProductsByName(query: string, limit = 15): Promise<OffProduct[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];
   try {
     const params = new URLSearchParams({
       search_terms: trimmed,
+      search_simple: '1',
+      action: 'process',
+      json: '1',
+      sort_by: 'unique_scans_n',
       fields: FIELDS,
       page_size: String(limit),
     });
-    const response = await fetch(`${BASE_URL}/search?${params.toString()}`);
+    const response = await fetch(`${DOMAIN}/cgi/search.pl?${params.toString()}`);
     if (!response.ok) return [];
     const data = (await response.json()) as OffSearchResponse;
     return (data.products ?? []).filter((p) => p.code && p.product_name);
