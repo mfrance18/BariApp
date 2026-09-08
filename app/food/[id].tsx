@@ -2,10 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
-import { AppButton } from '../../../../src/components/ui/AppButton';
-import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../../../src/components/FoodForm';
-import { archiveFood, getFoodById, updateFood, type Food } from '../../../../src/db/repositories/foodsRepo';
-import { colors } from '../../../../src/theme/theme';
+import { AppButton } from '../../src/components/ui/AppButton';
+import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../src/components/FoodForm';
+import { archiveFood, getFoodById, updateFood, type Food } from '../../src/db/repositories/foodsRepo';
+import { colors } from '../../src/theme/theme';
 
 function foodToFormValues(food: Food): FoodFormValues {
   return {

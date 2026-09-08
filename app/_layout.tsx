@@ -69,6 +69,8 @@ export default function RootLayout() {
           <Stack.Screen name="log/[mealType]/weigh" options={{ presentation: 'modal', headerShown: true, title: 'Weigh It' }} />
           <Stack.Screen name="scan-barcode" options={{ presentation: 'modal', headerShown: true, title: 'Scan Barcode' }} />
           <Stack.Screen name="weight-history" options={{ presentation: 'modal', headerShown: true, title: 'Weight History' }} />
+          <Stack.Screen name="food/new" options={{ presentation: 'modal', headerShown: true, title: 'New Food' }} />
+          <Stack.Screen name="food/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Edit Food' }} />
           <Stack.Screen name="meds/manage" options={{ headerShown: true, title: 'Manage Vitamins & Meds' }} />
           <Stack.Screen name="meds/[id]/edit" options={{ headerShown: true, title: 'Edit Schedule' }} />
         </Stack>

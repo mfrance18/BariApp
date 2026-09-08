@@ -21,7 +21,7 @@ export default function ScanBarcodeScreen() {
   const [lookingUp, setLookingUp] = useState(false);
   const handledRef = useRef(false);
 
-  const destination = returnTo ?? '/library/food/new';
+  const destination = returnTo ?? '/food/new';
   const context = { logMealType, logDate };
 
   async function handleBarcodeScanned({ data: barcode }: BarcodeScanningResult) {
@@ -37,7 +37,7 @@ export default function ScanBarcodeScreen() {
           params: { mealType: logMealType, itemType: 'food', itemId: String(existingFood.id), logDate },
         });
       } else {
-        router.replace(`/library/food/${existingFood.id}`);
+        router.replace(`/food/${existingFood.id}`);
       }
       return;
     }

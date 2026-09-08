@@ -74,7 +74,7 @@ export default function PickItemScreen() {
             style={styles.actionButton}
             onPress={() =>
               router.push({
-                pathname: '/library/food/new',
+                pathname: '/food/new',
                 params: { logMealType: mealType, logDate: effectiveLogDate },
               })
             }
@@ -86,7 +86,7 @@ export default function PickItemScreen() {
             onPress={() =>
               router.push({
                 pathname: '/scan-barcode',
-                params: { returnTo: '/library/food/new', logMealType: mealType, logDate: effectiveLogDate },
+                params: { returnTo: '/food/new', logMealType: mealType, logDate: effectiveLogDate },
               })
             }
           />

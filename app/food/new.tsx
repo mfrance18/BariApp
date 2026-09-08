@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { EMPTY_FOOD_FORM_VALUES, FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../../../src/components/FoodForm';
-import { createFood } from '../../../../src/db/repositories/foodsRepo';
+import { EMPTY_FOOD_FORM_VALUES, FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../src/components/FoodForm';
+import { createFood } from '../../src/db/repositories/foodsRepo';
 
 export default function NewFoodScreen() {
   const params = useLocalSearchParams<
@@ -51,7 +51,7 @@ export default function NewFoodScreen() {
       onScanBarcode={() =>
         router.push({
           pathname: '/scan-barcode',
-          params: { returnTo: '/library/food/new', logMealType: params.logMealType, logDate: params.logDate },
+          params: { returnTo: '/food/new', logMealType: params.logMealType, logDate: params.logDate },
         })
       }
     />

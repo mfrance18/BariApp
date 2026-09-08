@@ -57,13 +57,13 @@ export default function LibraryScreen() {
               title="+ New Food"
               variant="secondary"
               style={styles.actionButton}
-              onPress={() => router.push('/library/food/new')}
+              onPress={() => router.push('/food/new')}
             />
             <AppButton
               title="Scan Barcode"
               variant="secondary"
               style={styles.actionButton}
-              onPress={() => router.push({ pathname: '/scan-barcode', params: { returnTo: '/library/food/new' } })}
+              onPress={() => router.push({ pathname: '/scan-barcode', params: { returnTo: '/food/new' } })}
             />
           </>
         ) : (
@@ -76,7 +76,7 @@ export default function LibraryScreen() {
           data={foodsQuery.data ?? []}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => router.push(`/library/food/${item.id}`)}>
+            <TouchableOpacity style={styles.row} onPress={() => router.push(`/food/${item.id}`)}>
               <View style={styles.rowIcon}>
                 <Ionicons name="fast-food-outline" size={18} color={colors.primary} />
               </View>
