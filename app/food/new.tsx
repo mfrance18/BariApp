@@ -49,7 +49,7 @@ export default function NewFoodScreen() {
       submitting={mutation.isPending}
       onSubmit={(values) => mutation.mutate(values)}
       onScanBarcode={() =>
-        router.push({
+        router.replace({
           pathname: '/scan-barcode',
           params: { returnTo: '/food/new', logMealType: params.logMealType, logDate: params.logDate },
         })
