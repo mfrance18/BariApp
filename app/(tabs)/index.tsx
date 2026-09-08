@@ -6,6 +6,7 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 
 import { Card } from '../../src/components/ui/Card';
 import { ProgressRing } from '../../src/components/ui/ProgressRing';
+import { SwipeToDelete } from '../../src/components/ui/SwipeToDelete';
 import { listEntriesForDate as listFluidEntriesForDate } from '../../src/db/repositories/fluidRepo';
 import { deleteEntry, listEntriesForDate, type MealLogEntryWithName } from '../../src/db/repositories/mealLogRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
@@ -257,32 +258,34 @@ function MealSection({
         <Text style={styles.emptyText}>No items logged yet</Text>
       ) : (
         entries.map((entry) => (
-          <View key={entry.id} style={styles.entryRow}>
-            <TouchableOpacity
-              style={styles.entryTextGroup}
-              onPress={() =>
-                router.push({
-                  pathname: '/log/[mealType]/weigh',
-                  params: {
-                    mealType: entry.mealType,
-                    itemType: entry.itemType,
-                    itemId: String(entry.itemType === 'food' ? entry.foodId : entry.recipeId),
-                    logDate: entry.logDate,
-                    entryId: String(entry.id),
-                  },
-                })
-              }
-            >
-              <Text style={styles.entryName}>{entry.itemName}</Text>
-              <Text style={styles.entrySubtext}>
-                {entry.weightG != null ? `${entry.weightG} g` : `${entry.quantityAmount} ${entry.quantityUnit}`} ·{' '}
-                {Math.round(entry.calories)} kcal
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => onDelete(entry.id)} hitSlop={8}>
-              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
+          <SwipeToDelete key={entry.id} onDelete={() => onDelete(entry.id)}>
+            <View style={styles.entryRow}>
+              <TouchableOpacity
+                style={styles.entryTextGroup}
+                onPress={() =>
+                  router.push({
+                    pathname: '/log/[mealType]/weigh',
+                    params: {
+                      mealType: entry.mealType,
+                      itemType: entry.itemType,
+                      itemId: String(entry.itemType === 'food' ? entry.foodId : entry.recipeId),
+                      logDate: entry.logDate,
+                      entryId: String(entry.id),
+                    },
+                  })
+                }
+              >
+                <Text style={styles.entryName}>{entry.itemName}</Text>
+                <Text style={styles.entrySubtext}>
+                  {entry.weightG != null ? `${entry.weightG} g` : `${entry.quantityAmount} ${entry.quantityUnit}`} ·{' '}
+                  {Math.round(entry.calories)} kcal
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => onDelete(entry.id)} hitSlop={8}>
+                <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+          </SwipeToDelete>
         ))
       )}
 

@@ -1,9 +1,12 @@
+import 'react-native-gesture-handler';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { db } from '../src/db/client';
@@ -35,53 +38,62 @@ export default function RootLayout() {
 
   if (migrationsError || seedError) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.errorTitle}>Failed to set up the local database</Text>
-        <Text style={styles.errorDetail}>
-          {(migrationsError ?? seedError)?.message}
-        </Text>
-      </View>
+      <GestureHandlerRootView style={styles.flexFill}>
+        <View style={styles.center}>
+          <Text style={styles.errorTitle}>Failed to set up the local database</Text>
+          <Text style={styles.errorDetail}>
+            {(migrationsError ?? seedError)?.message}
+          </Text>
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   if (!migrationsSuccess || !seeded) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <GestureHandlerRootView style={styles.flexFill}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            headerStyle: { backgroundColor: colors.card },
-            headerTitleStyle: { color: colors.textPrimary, fontWeight: '700' },
-            headerTintColor: colors.primary,
-            headerShadowVisible: false,
-            contentStyle: { backgroundColor: colors.background },
-          }}
-        >
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="log/[mealType]/pick-item" options={{ presentation: 'modal', headerShown: true, title: 'Add Item' }} />
-          <Stack.Screen name="log/[mealType]/weigh" options={{ presentation: 'modal', headerShown: true, title: 'Weigh It' }} />
-          <Stack.Screen name="scan-barcode" options={{ presentation: 'modal', headerShown: true, title: 'Scan Barcode' }} />
-          <Stack.Screen name="weight-history" options={{ presentation: 'modal', headerShown: true, title: 'Weight History' }} />
-          <Stack.Screen name="food/new" options={{ presentation: 'modal', headerShown: true, title: 'New Food' }} />
-          <Stack.Screen name="food/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Edit Food' }} />
-          <Stack.Screen name="meds/manage" options={{ headerShown: true, title: 'Manage Vitamins & Meds' }} />
-          <Stack.Screen name="meds/[id]/edit" options={{ headerShown: true, title: 'Edit Schedule' }} />
-        </Stack>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={styles.flexFill}>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <StatusBar style="light" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              headerStyle: { backgroundColor: colors.card },
+              headerTitleStyle: { color: colors.textPrimary, fontWeight: '700' },
+              headerTintColor: colors.primary,
+              headerShadowVisible: false,
+              contentStyle: { backgroundColor: colors.background },
+            }}
+          >
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="log/[mealType]/pick-item" options={{ presentation: 'modal', headerShown: true, title: 'Add Item' }} />
+            <Stack.Screen name="log/[mealType]/weigh" options={{ presentation: 'modal', headerShown: true, title: 'Weigh It' }} />
+            <Stack.Screen name="scan-barcode" options={{ presentation: 'modal', headerShown: true, title: 'Scan Barcode' }} />
+            <Stack.Screen name="weight-history" options={{ presentation: 'modal', headerShown: true, title: 'Weight History' }} />
+            <Stack.Screen name="food/new" options={{ presentation: 'modal', headerShown: true, title: 'New Food' }} />
+            <Stack.Screen name="food/[id]" options={{ presentation: 'modal', headerShown: true, title: 'Edit Food' }} />
+            <Stack.Screen name="meds/manage" options={{ headerShown: true, title: 'Manage Vitamins & Meds' }} />
+            <Stack.Screen name="meds/[id]/edit" options={{ headerShown: true, title: 'Edit Schedule' }} />
+          </Stack>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
+  flexFill: {
+    flex: 1,
+  },
   center: {
     flex: 1,
     alignItems: 'center',

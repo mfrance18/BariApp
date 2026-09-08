@@ -6,6 +6,7 @@ import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'r
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
 import { KeyboardAvoidingScreen } from '../../src/components/ui/KeyboardAvoidingScreen';
+import { SwipeToDelete } from '../../src/components/ui/SwipeToDelete';
 import { createEntry, deleteEntry, listEntriesForDate, type FluidLogEntry } from '../../src/db/repositories/fluidRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
@@ -110,16 +111,18 @@ export default function FluidsScreen() {
 
 function FluidRow({ entry, onDelete }: { entry: FluidLogEntry; onDelete: () => void }) {
   return (
-    <View style={styles.row}>
-      <Ionicons name="water-outline" size={18} color={colors.fluid} />
-      <Text style={styles.rowText}>
-        {formatOz(mlToOz(entry.amountMl))} oz ·{' '}
-        {new Date(entry.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </Text>
-      <TouchableOpacity onPress={onDelete} hitSlop={8}>
-        <Ionicons name="close-circle" size={20} color={colors.textMuted} />
-      </TouchableOpacity>
-    </View>
+    <SwipeToDelete onDelete={onDelete}>
+      <View style={styles.row}>
+        <Ionicons name="water-outline" size={18} color={colors.fluid} />
+        <Text style={styles.rowText}>
+          {formatOz(mlToOz(entry.amountMl))} oz ·{' '}
+          {new Date(entry.loggedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+        <TouchableOpacity onPress={onDelete} hitSlop={8}>
+          <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+    </SwipeToDelete>
   );
 }
 

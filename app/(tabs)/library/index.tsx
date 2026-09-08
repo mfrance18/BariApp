@@ -1,15 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { OffFoodResults } from '../../../src/components/OffFoodResults';
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
-import { listFoods } from '../../../src/db/repositories/foodsRepo';
-import { listRecipes } from '../../../src/db/repositories/recipesRepo';
+import { SwipeToDelete } from '../../../src/components/ui/SwipeToDelete';
+import { deleteFood, listFoods, type Food } from '../../../src/db/repositories/foodsRepo';
+import { archiveRecipe, listRecipes, type Recipe } from '../../../src/db/repositories/recipesRepo';
 import { useOffFoodSearch } from '../../../src/services/openFoodFacts/useOffFoodSearch';
 import { colors, radius, spacing } from '../../../src/theme/theme';
 
@@ -34,6 +35,32 @@ export default function LibraryScreen() {
 
   const showOffSearch = activeTab === 'foods' && query.trim().length > 1;
   const offSearch = useOffFoodSearch(query, showOffSearch);
+
+  const deleteFoodMutation = useMutation({
+    mutationFn: (id: number) => deleteFood(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['foods'] }),
+    onError: (error: Error) => Alert.alert('Could not delete food', error.message),
+  });
+
+  function confirmDeleteFood(food: Food) {
+    Alert.alert('Delete Food', `Permanently delete "${food.name}" from your library? This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteFoodMutation.mutate(food.id) },
+    ]);
+  }
+
+  const deleteRecipeMutation = useMutation({
+    mutationFn: (id: number) => archiveRecipe(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['recipes'] }),
+    onError: (error: Error) => Alert.alert('Could not delete recipe', error.message),
+  });
+
+  function confirmDeleteRecipe(recipe: Recipe) {
+    Alert.alert('Delete Recipe', `Delete "${recipe.name}" from your library?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteRecipeMutation.mutate(recipe.id) },
+    ]);
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -100,18 +127,20 @@ export default function LibraryScreen() {
           data={foodsQuery.data ?? []}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => router.push(`/food/${item.id}`)}>
-              <View style={styles.rowIcon}>
-                <Ionicons name="fast-food-outline" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.rowTextGroup}>
-                <Text style={styles.rowTitle}>{item.name}</Text>
-                <Text style={styles.rowSubtitle}>
-                  {item.calories} kcal / {item.servingAmount} {item.servingUnit}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
+            <SwipeToDelete onDelete={() => confirmDeleteFood(item)}>
+              <TouchableOpacity style={styles.row} onPress={() => router.push(`/food/${item.id}`)}>
+                <View style={styles.rowIcon}>
+                  <Ionicons name="fast-food-outline" size={18} color={colors.primary} />
+                </View>
+                <View style={styles.rowTextGroup}>
+                  <Text style={styles.rowTitle}>{item.name}</Text>
+                  <Text style={styles.rowSubtitle}>
+                    {item.calories} kcal / {item.servingAmount} {item.servingUnit}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </SwipeToDelete>
           )}
           ListEmptyComponent={
             foodsQuery.isError ? (
@@ -145,18 +174,20 @@ export default function LibraryScreen() {
           data={recipesQuery.data ?? []}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.row} onPress={() => router.push(`/library/recipe/${item.id}`)}>
-              <View style={styles.rowIcon}>
-                <Ionicons name="restaurant-outline" size={18} color={colors.primary} />
-              </View>
-              <View style={styles.rowTextGroup}>
-                <Text style={styles.rowTitle}>{item.name}</Text>
-                <Text style={styles.rowSubtitle}>
-                  {item.cachedCaloriesPerServing} kcal/serving · {item.servings} servings
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
+            <SwipeToDelete onDelete={() => confirmDeleteRecipe(item)}>
+              <TouchableOpacity style={styles.row} onPress={() => router.push(`/library/recipe/${item.id}`)}>
+                <View style={styles.rowIcon}>
+                  <Ionicons name="restaurant-outline" size={18} color={colors.primary} />
+                </View>
+                <View style={styles.rowTextGroup}>
+                  <Text style={styles.rowTitle}>{item.name}</Text>
+                  <Text style={styles.rowSubtitle}>
+                    {item.cachedCaloriesPerServing} kcal/serving · {item.servings} servings
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            </SwipeToDelete>
           )}
           ListEmptyComponent={<Text style={styles.emptyText}>No recipes yet.</Text>}
         />
