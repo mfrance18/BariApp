@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { roundNutritionForDisplay } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
@@ -84,17 +85,32 @@ export function parseFoodFormValues(values: FoodFormValues): ParsedFoodValues | 
   };
 }
 
+interface SecondaryAction {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}
+
 interface FoodFormProps {
   initialValues: FoodFormValues;
   submitLabel: string;
   submitting?: boolean;
   onSubmit: (values: ParsedFoodValues) => void;
   onScanBarcode?: () => void;
+  secondaryAction?: SecondaryAction;
 }
 
-export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onScanBarcode }: FoodFormProps) {
+export function FoodForm({
+  initialValues,
+  submitLabel,
+  submitting,
+  onSubmit,
+  onScanBarcode,
+  secondaryAction,
+}: FoodFormProps) {
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   function set<K extends keyof FoodFormValues>(key: K, value: FoodFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -142,7 +158,10 @@ export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onS
     values.servingAmount && values.servingUnit ? `${values.servingAmount} ${values.servingUnit}` : 'serving';
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+    >
       {onScanBarcode && <AppButton title="Scan Barcode" variant="secondary" onPress={onScanBarcode} />}
 
       <Card style={styles.card}>
@@ -207,7 +226,23 @@ export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onS
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
-      <AppButton title={submitting ? 'Saving…' : submitLabel} onPress={handleSubmit} disabled={submitting} />
+      <View style={styles.actionsRow}>
+        <AppButton
+          title={submitting ? 'Saving…' : submitLabel}
+          onPress={handleSubmit}
+          disabled={submitting}
+          style={styles.actionButton}
+        />
+        {secondaryAction && (
+          <AppButton
+            title={secondaryAction.label}
+            variant="danger"
+            onPress={secondaryAction.onPress}
+            disabled={secondaryAction.disabled}
+            style={styles.actionButton}
+          />
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -298,5 +333,12 @@ const styles = StyleSheet.create({
   helperCaption: {
     fontSize: 12,
     color: colors.textMuted,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
   },
 });

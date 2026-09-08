@@ -1,9 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
 import { RecipeForm, type ParsedRecipeValues, type RecipeFormValues } from '../../../../src/components/RecipeForm';
-import { AppButton } from '../../../../src/components/ui/AppButton';
 import {
   archiveRecipe,
   getRecipeWithIngredients,
@@ -40,6 +39,9 @@ export default function EditRecipeScreen() {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       router.back();
     },
+    onError: (error: Error) => {
+      Alert.alert('Could not save changes', error.message);
+    },
   });
 
   const archiveMutation = useMutation({
@@ -48,7 +50,17 @@ export default function EditRecipeScreen() {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });
       router.back();
     },
+    onError: (error: Error) => {
+      Alert.alert('Could not delete recipe', error.message);
+    },
   });
+
+  function confirmDelete() {
+    Alert.alert('Delete Recipe', `Delete "${recipe?.name}" from your library?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => archiveMutation.mutate() },
+    ]);
+  }
 
   if (isLoading || !recipe) {
     return (
@@ -65,10 +77,12 @@ export default function EditRecipeScreen() {
         submitLabel="Save Changes"
         submitting={updateMutation.isPending}
         onSubmit={(values) => updateMutation.mutate(values)}
+        secondaryAction={{
+          label: archiveMutation.isPending ? 'Deleting…' : 'Delete Recipe',
+          onPress: confirmDelete,
+          disabled: archiveMutation.isPending,
+        }}
       />
-      <View style={styles.deleteRow}>
-        <AppButton title="Delete Recipe" variant="danger" onPress={() => archiveMutation.mutate()} />
-      </View>
     </View>
   );
 }
@@ -83,8 +97,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background,
-  },
-  deleteRow: {
-    padding: 16,
   },
 });

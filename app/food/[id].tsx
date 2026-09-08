@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 
-import { AppButton } from '../../src/components/ui/AppButton';
 import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../src/components/FoodForm';
 import { archiveFood, getFoodById, updateFood, type Food } from '../../src/db/repositories/foodsRepo';
 import { colors } from '../../src/theme/theme';
@@ -62,6 +61,13 @@ export default function EditFoodScreen() {
     },
   });
 
+  function confirmDelete() {
+    Alert.alert('Delete Food', `Delete "${food?.name}" from your library?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => archiveMutation.mutate() },
+    ]);
+  }
+
   if (isLoading || !food) {
     return (
       <View style={styles.center}>
@@ -77,10 +83,12 @@ export default function EditFoodScreen() {
         submitLabel="Save Changes"
         submitting={updateMutation.isPending}
         onSubmit={(values) => updateMutation.mutate(values)}
+        secondaryAction={{
+          label: archiveMutation.isPending ? 'Deleting…' : 'Delete Food',
+          onPress: confirmDelete,
+          disabled: archiveMutation.isPending,
+        }}
       />
-      <View style={styles.deleteRow}>
-        <AppButton title="Delete Food" variant="danger" onPress={() => archiveMutation.mutate()} />
-      </View>
     </View>
   );
 }
@@ -95,8 +103,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background,
-  },
-  deleteRow: {
-    padding: 16,
   },
 });

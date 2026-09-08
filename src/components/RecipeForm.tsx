@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { listFoods, type Food } from '../db/repositories/foodsRepo';
 import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
@@ -54,20 +55,28 @@ export function parseRecipeFormValues(values: RecipeFormValues): ParsedRecipeVal
   };
 }
 
+interface RecipeSecondaryAction {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+}
+
 interface RecipeFormProps {
   initialValues: RecipeFormValues;
   submitLabel: string;
   submitting?: boolean;
   onSubmit: (values: ParsedRecipeValues) => void;
+  secondaryAction?: RecipeSecondaryAction;
 }
 
-export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit }: RecipeFormProps) {
+export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, secondaryAction }: RecipeFormProps) {
   const [name, setName] = useState(initialValues.name);
   const [servings, setServings] = useState(initialValues.servings);
   const [notes, setNotes] = useState(initialValues.notes);
   const [ingredients, setIngredients] = useState<RecipeIngredientDraft[]>(initialValues.ingredients);
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const { data: searchResults } = useQuery({
     queryKey: ['foods', 'search', searchText],
@@ -129,7 +138,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit }:
   return (
     <FlatList
       style={styles.container}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
       data={ingredients}
       keyExtractor={(item, index) => `${item.food.id}-${index}`}
       ListHeaderComponent={
@@ -190,7 +199,23 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit }:
             </Card>
           )}
           {error && <Text style={styles.errorText}>{error}</Text>}
-          <AppButton title={submitting ? 'Saving…' : submitLabel} onPress={handleSubmit} disabled={submitting} />
+          <View style={styles.actionsRow}>
+            <AppButton
+              title={submitting ? 'Saving…' : submitLabel}
+              onPress={handleSubmit}
+              disabled={submitting}
+              style={styles.actionButton}
+            />
+            {secondaryAction && (
+              <AppButton
+                title={secondaryAction.label}
+                variant="danger"
+                onPress={secondaryAction.onPress}
+                disabled={secondaryAction.disabled}
+                style={styles.actionButton}
+              />
+            )}
+          </View>
         </View>
       }
     />
@@ -346,5 +371,12 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     fontSize: 13,
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  actionButton: {
+    flex: 1,
   },
 });
