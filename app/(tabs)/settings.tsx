@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../src/components/ui/AppButton';
@@ -19,6 +20,7 @@ export default function SettingsScreen() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const passwordRef = useRef<TextInput>(null);
 
   const loginMutation = useMutation({
@@ -95,19 +97,32 @@ export default function SettingsScreen() {
               onSubmitEditing={() => passwordRef.current?.focus()}
               blurOnSubmit={false}
             />
-            <TextInput
-              ref={passwordRef}
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor={colors.textMuted}
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              returnKeyType="done"
-              onSubmitEditing={() => {
-                if (email && password && !loginMutation.isPending) loginMutation.mutate();
-              }}
-            />
+            <View style={styles.passwordRow}>
+              <TextInput
+                ref={passwordRef}
+                style={[styles.input, styles.passwordInput]}
+                placeholder="Password"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry={!showPassword}
+                value={password}
+                onChangeText={setPassword}
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  if (email && password && !loginMutation.isPending) loginMutation.mutate();
+                }}
+              />
+              <TouchableOpacity
+                style={styles.eyeButton}
+                onPress={() => setShowPassword((prev) => !prev)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={20}
+                  color={colors.textMuted}
+                />
+              </TouchableOpacity>
+            </View>
             <AppButton
               title={loginMutation.isPending ? 'Connecting…' : 'Connect'}
               onPress={() => loginMutation.mutate()}
@@ -192,6 +207,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     fontSize: 15,
     color: colors.textPrimary,
+  },
+  passwordRow: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  passwordInput: {
+    paddingRight: spacing.xl + spacing.md,
+  },
+  eyeButton: {
+    position: 'absolute',
+    right: spacing.md,
   },
   buttonRow: {
     flexDirection: 'row',
