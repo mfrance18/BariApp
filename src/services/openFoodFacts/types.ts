@@ -22,3 +22,7 @@ export interface OffProductResponse {
   status: 0 | 1;
   product?: OffProduct;
 }
+
+export interface OffSearchResponse {
+  products?: OffProduct[];
+}

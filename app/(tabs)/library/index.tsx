@@ -4,11 +4,13 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { OffFoodResults } from '../../../src/components/OffFoodResults';
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { listFoods } from '../../../src/db/repositories/foodsRepo';
 import { listRecipes } from '../../../src/db/repositories/recipesRepo';
+import { useOffFoodSearch } from '../../../src/services/openFoodFacts/useOffFoodSearch';
 import { colors, radius, spacing } from '../../../src/theme/theme';
 
 type LibraryTab = 'foods' | 'recipes';
@@ -28,6 +30,10 @@ export default function LibraryScreen() {
     queryFn: () => listRecipes(query),
     enabled: activeTab === 'recipes',
   });
+
+  const showOffFallback =
+    activeTab === 'foods' && !foodsQuery.isLoading && !foodsQuery.isError && (foodsQuery.data?.length ?? 0) === 0;
+  const offSearch = useOffFoodSearch(query, showOffFallback);
 
   useFocusEffect(
     useCallback(() => {
@@ -104,9 +110,13 @@ export default function LibraryScreen() {
             </TouchableOpacity>
           )}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              {foodsQuery.isError ? `Couldn't load foods: ${(foodsQuery.error as Error).message}` : 'No foods yet.'}
-            </Text>
+            foodsQuery.isError ? (
+              <Text style={styles.emptyText}>Couldn't load foods: {(foodsQuery.error as Error).message}</Text>
+            ) : query.trim().length > 1 ? (
+              <OffFoodResults results={offSearch.results} loading={offSearch.loading} context={{ destination: '/food/new' }} />
+            ) : (
+              <Text style={styles.emptyText}>No foods yet.</Text>
+            )
           }
         />
       ) : (

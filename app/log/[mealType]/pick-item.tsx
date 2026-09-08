@@ -4,11 +4,13 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
+import { OffFoodResults } from '../../../src/components/OffFoodResults';
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { listFoods } from '../../../src/db/repositories/foodsRepo';
 import { listRecipes } from '../../../src/db/repositories/recipesRepo';
+import { useOffFoodSearch } from '../../../src/services/openFoodFacts/useOffFoodSearch';
 import { colors, radius, spacing } from '../../../src/theme/theme';
 import { todayLogDateKey } from '../../../src/utils/date';
 
@@ -32,6 +34,9 @@ export default function PickItemScreen() {
     queryFn: () => listRecipes(query),
     enabled: tab === 'recipes',
   });
+
+  const showOffFallback = tab === 'foods' && !foodsQuery.isLoading && (foodsQuery.data?.length ?? 0) === 0;
+  const offSearch = useOffFoodSearch(query, showOffFallback);
 
   useFocusEffect(
     useCallback(() => {
@@ -125,7 +130,17 @@ export default function PickItemScreen() {
               <Ionicons name="add-circle" size={22} color={colors.primary} />
             </TouchableOpacity>
           )}
-          ListEmptyComponent={<Text style={styles.emptyText}>No foods found. Add one above.</Text>}
+          ListEmptyComponent={
+            query.trim().length > 1 ? (
+              <OffFoodResults
+                results={offSearch.results}
+                loading={offSearch.loading}
+                context={{ destination: '/food/new', logMealType: mealType, logDate: effectiveLogDate }}
+              />
+            ) : (
+              <Text style={styles.emptyText}>No foods found. Add one above.</Text>
+            )
+          }
         />
       ) : (
         <FlatList

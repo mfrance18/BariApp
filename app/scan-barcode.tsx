@@ -1,12 +1,11 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '../src/components/ui/AppButton';
-import { getFoodByBarcode, restoreFood } from '../src/db/repositories/foodsRepo';
 import { getProductByBarcode } from '../src/services/openFoodFacts/client';
-import { mapOffProductToFood } from '../src/services/openFoodFacts/mapper';
+import { navigateToExistingFoodByBarcode, navigateToPrefilledFoodForm } from '../src/services/openFoodFacts/navigation';
 import { colors, radius, spacing } from '../src/theme/theme';
 
 const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
@@ -21,58 +20,18 @@ export default function ScanBarcodeScreen() {
   const [lookingUp, setLookingUp] = useState(false);
   const handledRef = useRef(false);
 
-  const destination = returnTo ?? '/food/new';
-  const context = { logMealType, logDate };
+  const context = { destination: returnTo ?? '/food/new', logMealType, logDate };
 
   async function handleBarcodeScanned({ data: barcode }: BarcodeScanningResult) {
     if (handledRef.current) return;
     handledRef.current = true;
     setLookingUp(true);
 
-    const existingFood = await getFoodByBarcode(barcode);
-    if (existingFood) {
-      if (existingFood.archivedAt) {
-        await restoreFood(existingFood.id);
-        Alert.alert('Restored', `"${existingFood.name}" was previously deleted and has been restored to your library.`);
-      }
-      if (logMealType) {
-        router.replace({
-          pathname: '/log/[mealType]/weigh',
-          params: { mealType: logMealType, itemType: 'food', itemId: String(existingFood.id), logDate },
-        });
-      } else {
-        router.replace(`/food/${existingFood.id}`);
-      }
-      return;
-    }
+    const handledExisting = await navigateToExistingFoodByBarcode(barcode, context);
+    if (handledExisting) return;
 
     const product = await getProductByBarcode(barcode);
-
-    if (!product) {
-      router.replace({ pathname: destination as never, params: { barcode, ...context } });
-      return;
-    }
-
-    const food = mapOffProductToFood(product, barcode);
-    router.replace({
-      pathname: destination as never,
-      params: {
-        barcode,
-        name: food.name,
-        brand: food.brand ?? '',
-        servingAmount: String(food.servingAmount),
-        servingUnit: food.servingUnit,
-        calories: String(food.calories),
-        proteinG: String(food.proteinG),
-        carbsG: String(food.carbsG),
-        fatG: String(food.fatG),
-        fiberG: String(food.fiberG),
-        sugarG: String(food.sugarG),
-        sodiumMg: String(food.sodiumMg),
-        source: 'open_food_facts',
-        ...context,
-      },
-    });
+    navigateToPrefilledFoodForm(product, barcode, context);
   }
 
   if (!permission) {
