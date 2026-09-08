@@ -20,7 +20,7 @@ export default function ScanBarcodeScreen() {
   const [lookingUp, setLookingUp] = useState(false);
   const handledRef = useRef(false);
 
-  const context = { destination: returnTo ?? '/food/new', logMealType, logDate };
+  const context = { destination: returnTo ?? '/food/new', logMealType, logDate, replace: true };
 
   async function handleBarcodeScanned({ data: barcode }: BarcodeScanningResult) {
     if (handledRef.current) return;

@@ -9,6 +9,15 @@ export interface FoodMatchContext {
   destination: string;
   logMealType?: string;
   logDate?: string;
+  /**
+   * True when the caller is itself a screen that was pushed onto the stack
+   * purely to resolve this match (e.g. the barcode scanner) and should be
+   * swapped out rather than left behind. False (the default) pushes a new
+   * screen instead — required when called directly from a tab screen like
+   * Library, where a replace would swap out the tab navigator itself and
+   * leave no way to navigate back.
+   */
+  replace?: boolean;
 }
 
 /**
@@ -25,13 +34,14 @@ export async function navigateToExistingFoodByBarcode(barcode: string, context: 
     Alert.alert('Restored', `"${existingFood.name}" was previously deleted and has been restored to your library.`);
   }
 
+  const navigate = context.replace ? router.replace : router.push;
   if (context.logMealType) {
-    router.replace({
+    navigate({
       pathname: '/log/[mealType]/weigh',
       params: { mealType: context.logMealType, itemType: 'food', itemId: String(existingFood.id), logDate: context.logDate },
     });
   } else {
-    router.replace(`/food/${existingFood.id}`);
+    navigate(`/food/${existingFood.id}`);
   }
   return true;
 }
@@ -42,8 +52,10 @@ export function navigateToPrefilledFoodForm(
   barcode: string,
   context: FoodMatchContext,
 ): void {
+  const navigate = context.replace ? router.replace : router.push;
+
   if (!product) {
-    router.replace({
+    navigate({
       pathname: context.destination as never,
       params: { barcode, logMealType: context.logMealType, logDate: context.logDate },
     });
@@ -51,7 +63,7 @@ export function navigateToPrefilledFoodForm(
   }
 
   const food = mapOffProductToFood(product, barcode);
-  router.replace({
+  navigate({
     pathname: context.destination as never,
     params: {
       barcode,
