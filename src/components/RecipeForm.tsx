@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { listFoods, type Food } from '../db/repositories/foodsRepo';
 import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
@@ -10,7 +9,7 @@ import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
-import { KeyboardAvoidingScreen } from './ui/KeyboardAvoidingScreen';
+import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from './ui/KeyboardAvoidingScreen';
 
 export interface RecipeIngredientDraft {
   food: Food;
@@ -77,7 +76,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [ingredients, setIngredients] = useState<RecipeIngredientDraft[]>(initialValues.ingredients);
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useKeyboardBottomPadding(24);
 
   const { data: searchResults } = useQuery({
     queryKey: ['foods', 'search', searchText],
@@ -140,7 +139,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     <KeyboardAvoidingScreen>
     <FlatList
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
       keyboardShouldPersistTaps="handled"
       data={ingredients}
       keyExtractor={(item, index) => `${item.food.id}-${index}`}

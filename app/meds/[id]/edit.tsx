@@ -5,7 +5,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOp
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
-import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
+import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import {
   archiveVitaminMed,
@@ -52,6 +52,7 @@ export default function EditVitaminMedScreen() {
   const [schedules, setSchedules] = useState<ScheduleDraft[]>(isNew ? [newScheduleDraft()] : []);
   const [error, setError] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(isNew);
+  const bottomPadding = useKeyboardBottomPadding(48);
 
   const medQuery = useQuery({
     queryKey: ['vitaminsMeds', vitaminMedId],
@@ -172,7 +173,11 @@ export default function EditVitaminMedScreen() {
 
   return (
     <KeyboardAvoidingScreen>
-    <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
+      keyboardShouldPersistTaps="handled"
+    >
       <Card style={styles.card}>
         <Field label="Name" value={name} onChangeText={setName} />
 

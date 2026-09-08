@@ -5,7 +5,7 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View } from
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
-import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
+import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
@@ -48,6 +48,7 @@ export default function WeighScreen() {
   const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
   const [scaleError, setScaleError] = useState<string | null>(null);
+  const bottomPadding = useKeyboardBottomPadding(spacing.xl * 2);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
@@ -186,7 +187,11 @@ export default function WeighScreen() {
 
   return (
     <KeyboardAvoidingScreen>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
+        keyboardShouldPersistTaps="handled"
+      >
       <Text style={styles.itemName}>{itemName}</Text>
       <Text style={styles.mealLabel}>Logging to {mealType}</Text>
 

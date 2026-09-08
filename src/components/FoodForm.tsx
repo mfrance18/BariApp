@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { roundNutritionForDisplay } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
-import { KeyboardAvoidingScreen } from './ui/KeyboardAvoidingScreen';
+import { KeyboardAvoidingScreen, useKeyboardBottomPadding } from './ui/KeyboardAvoidingScreen';
 
 export interface FoodFormValues {
   name: string;
@@ -111,7 +110,7 @@ export function FoodForm({
 }: FoodFormProps) {
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState<string | null>(null);
-  const insets = useSafeAreaInsets();
+  const bottomPadding = useKeyboardBottomPadding(24);
 
   function set<K extends keyof FoodFormValues>(key: K, value: FoodFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -162,7 +161,7 @@ export function FoodForm({
     <KeyboardAvoidingScreen>
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: 24 + insets.bottom }]}
+      contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
       keyboardShouldPersistTaps="handled"
     >
       {onScanBarcode && <AppButton title="Scan Barcode" variant="secondary" onPress={onScanBarcode} />}
