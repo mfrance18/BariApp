@@ -1,14 +1,8 @@
-import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { useLocalSearchParams } from 'expo-router';
-import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
-import { AppButton } from '../src/components/ui/AppButton';
+import { BarcodeScanner } from '../src/components/BarcodeScanner';
 import { getProductByBarcode } from '../src/services/openFoodFacts/client';
 import { navigateToExistingFoodByBarcode, navigateToPrefilledFoodForm } from '../src/services/openFoodFacts/navigation';
-import { colors, radius, spacing } from '../src/theme/theme';
-
-const BARCODE_TYPES = ['ean13', 'ean8', 'upc_a', 'upc_e'] as const;
 
 export default function ScanBarcodeScreen() {
   const { returnTo, logMealType, logDate } = useLocalSearchParams<{
@@ -16,17 +10,10 @@ export default function ScanBarcodeScreen() {
     logMealType?: string;
     logDate?: string;
   }>();
-  const [permission, requestPermission] = useCameraPermissions();
-  const [lookingUp, setLookingUp] = useState(false);
-  const handledRef = useRef(false);
 
   const context = { destination: returnTo ?? '/food/new', logMealType, logDate, replace: true };
 
-  async function handleBarcodeScanned({ data: barcode }: BarcodeScanningResult) {
-    if (handledRef.current) return;
-    handledRef.current = true;
-    setLookingUp(true);
-
+  async function handleScanned(barcode: string) {
     const handledExisting = await navigateToExistingFoodByBarcode(barcode, context);
     if (handledExisting) return;
 
@@ -34,132 +21,5 @@ export default function ScanBarcodeScreen() {
     navigateToPrefilledFoodForm(product, barcode, context);
   }
 
-  if (!permission) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.primary} />
-      </View>
-    );
-  }
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.center}>
-        <Text style={styles.message}>BariApp needs camera access to scan barcodes.</Text>
-        <AppButton title="Grant Camera Access" onPress={requestPermission} />
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <CameraView
-        style={StyleSheet.absoluteFill}
-        facing="back"
-        barcodeScannerSettings={{ barcodeTypes: [...BARCODE_TYPES] }}
-        onBarcodeScanned={lookingUp ? undefined : handleBarcodeScanned}
-      />
-      <View style={styles.scanFrameContainer} pointerEvents="none">
-        <View style={styles.scanFrame}>
-          <View style={[styles.corner, styles.cornerTopLeft]} />
-          <View style={[styles.corner, styles.cornerTopRight]} />
-          <View style={[styles.corner, styles.cornerBottomLeft]} />
-          <View style={[styles.corner, styles.cornerBottomRight]} />
-        </View>
-      </View>
-      <View style={styles.overlay}>
-        {lookingUp ? (
-          <>
-            <ActivityIndicator color="#fff" />
-            <Text style={styles.overlayText}>Looking up product…</Text>
-          </>
-        ) : (
-          <Text style={styles.overlayText}>Point the camera at a barcode</Text>
-        )}
-      </View>
-    </View>
-  );
+  return <BarcodeScanner onScanned={handleScanned} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.md,
-    backgroundColor: colors.background,
-  },
-  message: {
-    textAlign: 'center',
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  scanFrameContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scanFrame: {
-    width: 280,
-    height: 170,
-  },
-  corner: {
-    position: 'absolute',
-    width: 32,
-    height: 32,
-    borderColor: '#fff',
-  },
-  cornerTopLeft: {
-    top: 0,
-    left: 0,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
-    borderTopLeftRadius: 8,
-  },
-  cornerTopRight: {
-    top: 0,
-    right: 0,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
-    borderTopRightRadius: 8,
-  },
-  cornerBottomLeft: {
-    bottom: 0,
-    left: 0,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
-    borderBottomLeftRadius: 8,
-  },
-  cornerBottomRight: {
-    bottom: 0,
-    right: 0,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
-    borderBottomRightRadius: 8,
-  },
-  overlay: {
-    position: 'absolute',
-    bottom: 48,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    gap: 8,
-  },
-  overlayText: {
-    color: '#fff',
-    fontSize: 15,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-});

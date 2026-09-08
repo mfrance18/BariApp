@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createFood, getFoodByBarcode, listFoods, restoreFood, type Food } from '../db/repositories/foodsRepo';
+import { getProductByBarcode } from '../services/openFoodFacts/client';
 import { mapOffProductToFood } from '../services/openFoodFacts/mapper';
 import type { OffProduct } from '../services/openFoodFacts/types';
 import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
@@ -13,6 +14,7 @@ import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutri
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { isWeighableUnit } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
+import { BarcodeScanner } from './BarcodeScanner';
 import { Card } from './ui/Card';
 import { OffFoodResults } from './OffFoodResults';
 
@@ -81,6 +83,8 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [ingredients, setIngredients] = useState<RecipeIngredientDraft[]>(initialValues.ingredients);
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [scannerVisible, setScannerVisible] = useState(false);
+  const [scanStatus, setScanStatus] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   const { data: searchResults } = useQuery({
@@ -115,14 +119,17 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     }
   }, [ingredients, servings]);
 
-  function addIngredient(food: Food) {
+  /** Returns an error message if the food couldn't be added (not a weighable unit), or null on success. */
+  function addIngredient(food: Food): string | null {
     if (!isWeighableUnit(food.servingUnit)) {
-      setError(`${food.name} is logged as "${food.servingAmount} ${food.servingUnit}", not a weight, so it can't be used in a recipe.`);
-      return;
+      const message = `${food.name} is logged as "${food.servingAmount} ${food.servingUnit}", not a weight, so it can't be used in a recipe.`;
+      setError(message);
+      return message;
     }
     setError(null);
     setIngredients((prev) => [...prev, { food, quantityG: '100' }]);
     setSearchText('');
+    return null;
   }
 
   async function handleSelectOffProduct(product: OffProduct) {
@@ -139,6 +146,30 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       addIngredient(created);
     } catch (err) {
       setError((err as Error).message);
+    }
+  }
+
+  async function handleScanIngredient(barcode: string) {
+    try {
+      const existing = await getFoodByBarcode(barcode);
+      let food: Food;
+      if (existing) {
+        if (existing.archivedAt) {
+          await restoreFood(existing.id);
+        }
+        food = { ...existing, archivedAt: null };
+      } else {
+        const product = await getProductByBarcode(barcode);
+        if (!product) {
+          setScanStatus("Barcode not found on Open Food Facts — try searching by name instead.");
+          return;
+        }
+        food = await createFood(mapOffProductToFood(product, barcode));
+      }
+      const errorMessage = addIngredient(food);
+      setScanStatus(errorMessage ?? `Added "${food.name}".`);
+    } catch (err) {
+      setScanStatus((err as Error).message);
     }
   }
 
@@ -161,6 +192,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   }
 
   return (
+    <>
     <KeyboardAwareFlatList
       style={styles.container}
       contentContainerStyle={StyleSheet.flatten([styles.content, { paddingBottom: 24 + insets.bottom }])}
@@ -179,6 +211,14 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
           </Card>
 
           <Text style={styles.sectionLabel}>INGREDIENTS</Text>
+          <AppButton
+            title="Scan Barcode"
+            variant="secondary"
+            onPress={() => {
+              setScanStatus(null);
+              setScannerVisible(true);
+            }}
+          />
           <View style={styles.searchRow}>
             <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
             <TextInput
@@ -262,6 +302,15 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         </View>
       }
     />
+    <Modal visible={scannerVisible} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
+      <View style={styles.scannerModal}>
+        <BarcodeScanner onScanned={handleScanIngredient} statusText={scanStatus ?? undefined} />
+        <View style={[styles.scannerCloseRow, { paddingBottom: 16 + insets.bottom }]}>
+          <AppButton title="Done" onPress={() => setScannerVisible(false)} />
+        </View>
+      </View>
+    </Modal>
+    </>
   );
 }
 
@@ -356,6 +405,14 @@ const styles = StyleSheet.create({
   },
   offSection: {
     marginTop: spacing.sm,
+  },
+  scannerModal: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  scannerCloseRow: {
+    padding: spacing.lg,
+    backgroundColor: colors.background,
   },
   searchResultRow: {
     flexDirection: 'row',
