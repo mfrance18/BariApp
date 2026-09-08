@@ -227,24 +227,31 @@ function toWeightReading(raw: RawScaleReading, fallbackId: string): WeightReadin
 }
 
 /**
- * NOTE: newer VeSync device categories may expect a nested
- * `{ deviceId, configModel, payload: { method, source, data } }` shape
- * instead of this flat `jsonCmd` envelope — unconfirmed for the scale
- * category specifically. If scale reads fail here (see
- * DEBUG_LOG_RAW_RESPONSES), check the raw response `msg` first.
+ * VeSync's current bypassV2 protocol (confirmed against pyvesync's device
+ * command mixin, which doesn't itself support scales but uses this same
+ * envelope for every other device category) wraps the actual command in a
+ * nested `payload: { method, source, data }` object, and duplicates the
+ * device id under both its old (`cid`/`configModule`) and new
+ * (`deviceId`/`configModel`) field names. No open-source project has
+ * reverse-engineered the scale-specific `payload.method` command name or
+ * response shape, so `getWeighingDataV2` and the RawScaleReading fields
+ * below remain a best-effort guess — check DEBUG_LOG_RAW_RESPONSES output
+ * if this still fails.
  */
 async function bypassCommand<T>(
   session: VeSyncSession,
   device: VeSyncDevice,
-  jsonCmd: Record<string, unknown>,
+  payloadMethod: string,
+  data: Record<string, unknown> = {},
 ): Promise<T | null> {
-  const data = await postJson<{ result?: T }>('/cloud/v1/deviceManaged/bypassV2', {
+  const response = await postJson<{ result?: T }>('/cloud/v1/deviceManaged/bypassV2', {
     method: 'bypassV2',
     accountID: session.accountId,
     token: session.token,
     cid: device.cid,
-    uuid: device.uuid,
+    deviceId: device.cid,
     configModule: device.configModule,
+    configModel: device.configModule,
     acceptLanguage: ACCEPT_LANGUAGE,
     appVersion: APP_VERSION,
     phoneBrand: PHONE_BRAND,
@@ -253,26 +260,26 @@ async function bypassCommand<T>(
     userCountryCode: REGION,
     debugMode: false,
     traceId: newTraceId(session.terminalId),
-    jsonCmd,
+    payload: { method: payloadMethod, source: 'APP', data },
   });
 
-  logDebug(`bypassV2 ${Object.keys(jsonCmd)[0]} response`, data);
+  logDebug(`bypassV2 ${payloadMethod} response`, response);
 
-  if (data.code !== 0) {
-    if (data.code === -11201022 || data.code === -11012022) {
-      throw new VeSyncAuthError(data.msg ?? 'VeSync session expired');
+  if (response.code !== 0) {
+    if (response.code === -11201022 || response.code === -11012022) {
+      throw new VeSyncAuthError(response.msg ?? 'VeSync session expired');
     }
     return null;
   }
 
-  return data.result?.result ?? null;
+  return response.result?.result ?? null;
 }
 
 export async function getLatestScaleReading(
   session: VeSyncSession,
   device: VeSyncDevice,
 ): Promise<WeightReading | null> {
-  const result = await bypassCommand<RawScaleReading>(session, device, { getWeighingDataV2: {} });
+  const result = await bypassCommand<RawScaleReading>(session, device, 'getWeighingDataV2');
   if (!result) return null;
   return toWeightReading(result, `${device.cid}-latest`);
 }
@@ -282,11 +289,9 @@ export async function getScaleWeightHistory(
   device: VeSyncDevice,
   sinceDate: Date,
 ): Promise<WeightReading[]> {
-  const result = await bypassCommand<{ items?: RawScaleReading[] }>(session, device, {
-    getWeighingDataV2: {
-      beginDay: sinceDate.toISOString().slice(0, 10).replace(/-/g, ''),
-      endDay: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
-    },
+  const result = await bypassCommand<{ items?: RawScaleReading[] }>(session, device, 'getWeighingDataV2', {
+    beginDay: sinceDate.toISOString().slice(0, 10).replace(/-/g, ''),
+    endDay: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
   });
 
   const items = result?.items;
