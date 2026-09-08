@@ -1,13 +1,13 @@
 import { and, desc, eq, isNull, like, or } from 'drizzle-orm';
 
 import { db } from '../client';
-import { foods } from '../schema';
+import { foods, recipeIngredients, recipes } from '../schema';
 
 export type Food = typeof foods.$inferSelect;
 export type NewFood = typeof foods.$inferInsert;
 
 export async function listFoods(searchQuery?: string): Promise<Food[]> {
-  const conditions = [isNull(foods.archivedAt)];
+  const conditions = [];
   if (searchQuery && searchQuery.trim().length > 0) {
     const pattern = `%${searchQuery.trim()}%`;
     conditions.push(or(like(foods.name, pattern), like(foods.brand, pattern))!);
@@ -15,7 +15,7 @@ export async function listFoods(searchQuery?: string): Promise<Food[]> {
   return db
     .select()
     .from(foods)
-    .where(and(...conditions))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(desc(foods.updatedAt));
 }
 
@@ -29,7 +29,7 @@ export async function getFoodByBarcode(barcode: string): Promise<Food | null> {
   return rows[0] ?? null;
 }
 
-export async function createFood(input: Omit<NewFood, 'id' | 'createdAt' | 'updatedAt' | 'archivedAt'>): Promise<Food> {
+export async function createFood(input: Omit<NewFood, 'id' | 'createdAt' | 'updatedAt'>): Promise<Food> {
   const now = new Date().toISOString();
   const rows = await db
     .insert(foods)
@@ -48,13 +48,27 @@ export async function updateFood(
     .where(eq(foods.id, id));
 }
 
-export async function archiveFood(id: number): Promise<void> {
-  await db
-    .update(foods)
-    .set({ archivedAt: new Date().toISOString() })
-    .where(eq(foods.id, id));
-}
+/**
+ * Permanently deletes a food. Refuses (rather than leaving a dangling
+ * reference) if it's still used by an active recipe, since recipes always
+ * live-scale nutrition from the referenced food. A food used only in
+ * historical meal log entries can still be deleted — those entries already
+ * snapshot their own nutrition and fall back to "Unknown food" for display
+ * (see listEntriesForDate in mealLogRepo.ts).
+ */
+export async function deleteFood(id: number): Promise<void> {
+  const usedInRecipes = await db
+    .selectDistinct({ name: recipes.name })
+    .from(recipeIngredients)
+    .innerJoin(recipes, eq(recipeIngredients.recipeId, recipes.id))
+    .where(and(eq(recipeIngredients.foodId, id), isNull(recipes.archivedAt)));
 
-export async function restoreFood(id: number): Promise<void> {
-  await db.update(foods).set({ archivedAt: null }).where(eq(foods.id, id));
+  if (usedInRecipes.length > 0) {
+    const names = usedInRecipes.map((r) => r.name).join(', ');
+    throw new Error(
+      `This food is used in ${names}. Remove it from ${usedInRecipes.length === 1 ? 'that recipe' : 'those recipes'} before deleting.`,
+    );
+  }
+
+  await db.delete(foods).where(eq(foods.id, id));
 }

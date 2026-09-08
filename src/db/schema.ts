@@ -36,7 +36,6 @@ export const foods = sqliteTable(
     sodiumMg: real('sodium_mg').notNull().default(0),
     notes: text('notes'),
     ...timestamps,
-    archivedAt: text('archived_at'),
   },
   (table) => [uniqueIndex('idx_foods_barcode').on(table.barcode)],
 );

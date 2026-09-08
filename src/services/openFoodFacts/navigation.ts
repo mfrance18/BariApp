@@ -1,7 +1,6 @@
 import { router } from 'expo-router';
-import { Alert } from 'react-native';
 
-import { getFoodByBarcode, restoreFood } from '../../db/repositories/foodsRepo';
+import { getFoodByBarcode } from '../../db/repositories/foodsRepo';
 import { mapOffProductToFood } from './mapper';
 import type { OffProduct } from './types';
 
@@ -21,18 +20,13 @@ export interface FoodMatchContext {
 }
 
 /**
- * If a food with this barcode already exists locally, navigates to it
- * (restoring it first if it was deleted) and returns true. Returns false
- * if there's no local match, so the caller can fall back to OFF data.
+ * If a food with this barcode already exists locally, navigates to it and
+ * returns true. Returns false if there's no local match, so the caller can
+ * fall back to OFF data.
  */
 export async function navigateToExistingFoodByBarcode(barcode: string, context: FoodMatchContext): Promise<boolean> {
   const existingFood = await getFoodByBarcode(barcode);
   if (!existingFood) return false;
-
-  if (existingFood.archivedAt) {
-    await restoreFood(existingFood.id);
-    Alert.alert('Restored', `"${existingFood.name}" was previously deleted and has been restored to your library.`);
-  }
 
   const navigate = context.replace ? router.replace : router.push;
   if (context.logMealType) {

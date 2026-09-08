@@ -5,7 +5,7 @@ import type { OffProduct } from './types';
 
 const KJ_TO_KCAL = 4.184;
 
-export type OffFoodInput = Omit<NewFood, 'id' | 'createdAt' | 'updatedAt' | 'archivedAt'>;
+export type OffFoodInput = Omit<NewFood, 'id' | 'createdAt' | 'updatedAt'>;
 
 interface ServingLabel {
   amount: number;

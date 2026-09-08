@@ -1,13 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { createFood, getFoodByBarcode, listFoods, restoreFood, updateFood, type Food } from '../db/repositories/foodsRepo';
+import { createFood, getFoodByBarcode, listFoods, updateFood, type Food } from '../db/repositories/foodsRepo';
 import { getProductByBarcode } from '../services/openFoodFacts/client';
-import { mapOffProductToFood } from '../services/openFoodFacts/mapper';
+import { mapOffProductToFood, type OffFoodInput } from '../services/openFoodFacts/mapper';
 import type { OffProduct } from '../services/openFoodFacts/types';
 import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
 import { computeRecipeTotals, getReferenceWeightG, roundNutritionForDisplay, scaleNutrition } from '../services/nutrition/scaling';
@@ -57,6 +57,20 @@ function nutritionDraftForQuantity(food: Food, amount: number, unit: string): Nu
   } catch {
     return null;
   }
+}
+
+/**
+ * A food that doesn't exist in the library yet (e.g. resolved from an OFF
+ * search or barcode scan) — identified by a negative placeholder id so it's
+ * distinguishable from a real, persisted food. Only actually written to the
+ * database once the recipe itself is saved (see `handleSubmit`).
+ */
+function buildPendingFood(input: OffFoodInput, tempId: number): Food {
+  const now = new Date().toISOString();
+  // mapOffProductToFood always sets every field explicitly (never leaves one
+  // undefined), so this is a real Food shape even though OffFoodInput's
+  // insert-derived type marks defaulted columns as optional.
+  return { id: tempId, createdAt: now, updatedAt: now, ...input } as Food;
 }
 
 export interface RecipeIngredientDraft {
@@ -140,8 +154,10 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [nutritionDraft, setNutritionDraft] = useState<NutritionDraft>(EMPTY_NUTRITION_DRAFT);
   const [savingIngredient, setSavingIngredient] = useState(false);
   const [quantityError, setQuantityError] = useState<string | null>(null);
+  const [resolvingIngredients, setResolvingIngredients] = useState(false);
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const nextTempIdRef = useRef(-1);
 
   function setNutritionField<K extends keyof NutritionDraft>(key: K, value: string) {
     setNutritionDraft((prev) => ({ ...prev, [key]: value }));
@@ -268,10 +284,15 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
           sugarG: enteredNutrition.sugarG * ratio,
           sodiumMg: enteredNutrition.sodiumMg * ratio,
         });
-        setSavingIngredient(true);
-        await updateFood(pendingIngredient.id, baseNutrition);
+        if (pendingIngredient.id > 0) {
+          // Already in the library — the correction can be saved right away.
+          setSavingIngredient(true);
+          await updateFood(pendingIngredient.id, baseNutrition);
+          queryClient.invalidateQueries({ queryKey: ['foods'] });
+        }
+        // Not yet persisted (negative placeholder id) — just update the
+        // local draft; it's written to the library when the recipe is saved.
         food = { ...pendingIngredient, ...baseNutrition };
-        queryClient.invalidateQueries({ queryKey: ['foods'] });
       }
     } catch (err) {
       setQuantityError((err as Error).message);
@@ -286,18 +307,29 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     setQuantityError(null);
   }
 
+  /**
+   * Finds a food already added to this recipe as a not-yet-persisted draft
+   * with the given barcode, so re-selecting the same OFF result twice
+   * doesn't create two separate pending drafts for it.
+   */
+  function findPendingDraftByBarcode(barcode: string): Food | null {
+    return ingredients.find((i) => i.food.id < 0 && i.food.barcode === barcode)?.food ?? null;
+  }
+
   async function handleSelectOffProduct(product: OffProduct) {
     try {
       const existing = await getFoodByBarcode(product.code);
       if (existing) {
-        if (existing.archivedAt) {
-          await restoreFood(existing.id);
-        }
-        requestAddIngredient({ ...existing, archivedAt: null });
+        requestAddIngredient(existing);
         return;
       }
-      const created = await createFood(mapOffProductToFood(product, product.code));
-      requestAddIngredient(created);
+      const pending = findPendingDraftByBarcode(product.code);
+      if (pending) {
+        requestAddIngredient(pending);
+        return;
+      }
+      const draft = buildPendingFood(mapOffProductToFood(product, product.code), nextTempIdRef.current--);
+      requestAddIngredient(draft);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -308,17 +340,19 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       const existing = await getFoodByBarcode(barcode);
       let food: Food;
       if (existing) {
-        if (existing.archivedAt) {
-          await restoreFood(existing.id);
-        }
-        food = { ...existing, archivedAt: null };
+        food = existing;
       } else {
-        const product = await getProductByBarcode(barcode);
-        if (!product) {
-          setScanStatus("Barcode not found on Open Food Facts — try searching by name instead.");
-          return;
+        const pending = findPendingDraftByBarcode(barcode);
+        if (pending) {
+          food = pending;
+        } else {
+          const product = await getProductByBarcode(barcode);
+          if (!product) {
+            setScanStatus("Barcode not found on Open Food Facts — try searching by name instead.");
+            return;
+          }
+          food = buildPendingFood(mapOffProductToFood(product, barcode), nextTempIdRef.current--);
         }
-        food = await createFood(mapOffProductToFood(product, barcode));
       }
       const errorMessage = requestAddIngredient(food);
       if (errorMessage) {
@@ -344,8 +378,46 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     setIngredients((prev) => prev.map((ing, i) => (i === index ? { ...ing, quantityUnit } : ing)));
   }
 
-  function handleSubmit() {
-    const parsed = parseRecipeFormValues({ name, servings, notes, ingredients });
+  async function handleSubmit() {
+    // Ingredients resolved from OFF/scanning that aren't in the library yet
+    // (negative placeholder id) are only written to the database now, right
+    // before the recipe itself is saved.
+    let resolvedIngredients = ingredients;
+    const pendingTempIds = [...new Set(ingredients.filter((i) => i.food.id < 0).map((i) => i.food.id))];
+    if (pendingTempIds.length > 0) {
+      setResolvingIngredients(true);
+      const createdByTempId = new Map<number, Food>();
+      let creationError: Error | null = null;
+      for (const tempId of pendingTempIds) {
+        try {
+          const draft = ingredients.find((i) => i.food.id === tempId)!.food;
+          const { id, createdAt, updatedAt, ...draftFields } = draft;
+          const created = await createFood(draftFields);
+          createdByTempId.set(tempId, created);
+        } catch (err) {
+          creationError = err as Error;
+          break;
+        }
+      }
+      // Commit whatever succeeded even on failure, so a retry after fixing
+      // the error doesn't try to recreate (and duplicate-barcode-fail on)
+      // foods that were already created on this attempt.
+      resolvedIngredients = ingredients.map((ingredient) => {
+        const created = createdByTempId.get(ingredient.food.id);
+        return created ? { ...ingredient, food: created } : ingredient;
+      });
+      setIngredients(resolvedIngredients);
+      if (createdByTempId.size > 0) {
+        queryClient.invalidateQueries({ queryKey: ['foods'] });
+      }
+      setResolvingIngredients(false);
+      if (creationError) {
+        setError(creationError.message);
+        return;
+      }
+    }
+
+    const parsed = parseRecipeFormValues({ name, servings, notes, ingredients: resolvedIngredients });
     if ('error' in parsed) {
       setError(parsed.error);
       return;
@@ -450,9 +522,9 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         {error && <Text style={styles.errorText}>{error}</Text>}
         <View style={styles.actionsRow}>
           <AppButton
-            title={submitting ? 'Saving…' : submitLabel}
+            title={submitting || resolvingIngredients ? 'Saving…' : submitLabel}
             onPress={handleSubmit}
-            disabled={submitting}
+            disabled={submitting || resolvingIngredients}
             style={styles.actionButton}
           />
           {secondaryAction && (

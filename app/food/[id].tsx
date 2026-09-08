@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 
 import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../src/components/FoodForm';
-import { archiveFood, getFoodById, updateFood, type Food } from '../../src/db/repositories/foodsRepo';
+import { deleteFood, getFoodById, updateFood, type Food } from '../../src/db/repositories/foodsRepo';
 import { colors } from '../../src/theme/theme';
 
 function foodToFormValues(food: Food): FoodFormValues {
@@ -52,8 +52,8 @@ export default function EditFoodScreen() {
     },
   });
 
-  const archiveMutation = useMutation({
-    mutationFn: () => archiveFood(foodId),
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteFood(foodId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['foods'] });
       router.back();
@@ -64,16 +64,28 @@ export default function EditFoodScreen() {
   });
 
   function confirmDelete() {
-    Alert.alert('Delete Food', `Delete "${food?.name}" from your library?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => archiveMutation.mutate() },
-    ]);
+    Alert.alert(
+      'Delete Food',
+      `Permanently delete "${food?.name}" from your library? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate() },
+      ],
+    );
   }
 
-  if (isLoading || !food) {
+  if (isLoading) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
+  if (!food) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.notFoundText}>This food no longer exists.</Text>
       </View>
     );
   }
@@ -86,9 +98,9 @@ export default function EditFoodScreen() {
         submitting={updateMutation.isPending}
         onSubmit={(values) => updateMutation.mutate(values)}
         secondaryAction={{
-          label: archiveMutation.isPending ? 'Deleting…' : 'Delete Food',
+          label: deleteMutation.isPending ? 'Deleting…' : 'Delete Food',
           onPress: confirmDelete,
-          disabled: archiveMutation.isPending,
+          disabled: deleteMutation.isPending,
         }}
       />
     </View>
@@ -105,5 +117,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background,
+  },
+  notFoundText: {
+    color: colors.textMuted,
+    fontSize: 15,
   },
 });
