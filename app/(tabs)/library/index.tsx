@@ -37,6 +37,7 @@ export default function LibraryScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setQuery('');
       if (activeTab === 'foods') {
         foodsQuery.refetch();
       } else {

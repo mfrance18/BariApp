@@ -40,6 +40,7 @@ export default function PickItemScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setQuery('');
       if (tab === 'foods') {
         foodsQuery.refetch();
       } else {
