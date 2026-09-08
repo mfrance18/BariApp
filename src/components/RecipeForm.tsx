@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { createFood, getFoodByBarcode, listFoods, restoreFood, type Food } from '../db/repositories/foodsRepo';
+import { createFood, getFoodByBarcode, listFoods, restoreFood, updateFood, type Food } from '../db/repositories/foodsRepo';
 import { getProductByBarcode } from '../services/openFoodFacts/client';
 import { mapOffProductToFood } from '../services/openFoodFacts/mapper';
 import type { OffProduct } from '../services/openFoodFacts/types';
@@ -17,6 +17,38 @@ import { AppButton } from './ui/AppButton';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Card } from './ui/Card';
 import { OffFoodResults } from './OffFoodResults';
+
+interface NutritionDraft {
+  calories: string;
+  proteinG: string;
+  carbsG: string;
+  fatG: string;
+  fiberG: string;
+  sugarG: string;
+  sodiumMg: string;
+}
+
+const EMPTY_NUTRITION_DRAFT: NutritionDraft = {
+  calories: '',
+  proteinG: '',
+  carbsG: '',
+  fatG: '',
+  fiberG: '',
+  sugarG: '',
+  sodiumMg: '',
+};
+
+function nutritionDraftFromFood(food: Food): NutritionDraft {
+  return {
+    calories: String(food.calories),
+    proteinG: String(food.proteinG),
+    carbsG: String(food.carbsG),
+    fatG: String(food.fatG),
+    fiberG: String(food.fiberG),
+    sugarG: String(food.sugarG),
+    sodiumMg: String(food.sodiumMg),
+  };
+}
 
 export interface RecipeIngredientDraft {
   food: Food;
@@ -96,8 +128,15 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [pendingIngredient, setPendingIngredient] = useState<Food | null>(null);
   const [quantityAmount, setQuantityAmount] = useState('');
   const [quantityUnit, setQuantityUnit] = useState('');
+  const [nutritionDraft, setNutritionDraft] = useState<NutritionDraft>(EMPTY_NUTRITION_DRAFT);
+  const [savingIngredient, setSavingIngredient] = useState(false);
   const [quantityError, setQuantityError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
+
+  function setNutritionField<K extends keyof NutritionDraft>(key: K, value: string) {
+    setNutritionDraft((prev) => ({ ...prev, [key]: value }));
+  }
 
   const { data: searchResults } = useQuery({
     queryKey: ['foods', 'search', searchText],
@@ -152,11 +191,12 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       setQuantityAmount(food.servingWeightG != null ? String(food.servingWeightG) : '');
       setQuantityUnit('g');
     }
+    setNutritionDraft(nutritionDraftFromFood(food));
     setPendingIngredient(food);
     return null;
   }
 
-  function confirmAddIngredient() {
+  async function confirmAddIngredient() {
     if (!pendingIngredient) return;
     const amount = Number(quantityAmount);
     if (!amount || amount <= 0) {
@@ -168,10 +208,37 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       setQuantityError(`"${unit}" isn't a recognized weight unit (try g, oz, lb, kg, ml)`);
       return;
     }
-    setIngredients((prev) => [
-      ...prev,
-      { food: pendingIngredient, quantityAmount: String(amount), quantityUnit: unit },
-    ]);
+
+    const num = (s: string) => (s.trim() ? Number(s) : 0);
+    const editedNutrition = {
+      calories: num(nutritionDraft.calories),
+      proteinG: num(nutritionDraft.proteinG),
+      carbsG: num(nutritionDraft.carbsG),
+      fatG: num(nutritionDraft.fatG),
+      fiberG: num(nutritionDraft.fiberG),
+      sugarG: num(nutritionDraft.sugarG),
+      sodiumMg: num(nutritionDraft.sodiumMg),
+    };
+    const nutritionChanged = (Object.keys(editedNutrition) as (keyof typeof editedNutrition)[]).some(
+      (key) => editedNutrition[key] !== pendingIngredient[key],
+    );
+
+    let food = pendingIngredient;
+    if (nutritionChanged) {
+      setSavingIngredient(true);
+      try {
+        await updateFood(pendingIngredient.id, editedNutrition);
+        food = { ...pendingIngredient, ...editedNutrition };
+        queryClient.invalidateQueries({ queryKey: ['foods'] });
+      } catch (err) {
+        setQuantityError((err as Error).message);
+        setSavingIngredient(false);
+        return;
+      }
+      setSavingIngredient(false);
+    }
+
+    setIngredients((prev) => [...prev, { food, quantityAmount: String(amount), quantityUnit: unit }]);
     setSearchText('');
     setPendingIngredient(null);
     setQuantityError(null);
@@ -373,44 +440,106 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       onRequestClose={() => setPendingIngredient(null)}
     >
       <View style={styles.quantityModalOverlay}>
-        <Card style={styles.quantityModalCard}>
-          <Text style={styles.quantityModalTitle}>Add {pendingIngredient?.name}</Text>
-          <View style={styles.servingSizeRow}>
-            <View style={styles.servingAmountField}>
-              <Text style={styles.fieldLabel}>Amount</Text>
-              <TextInput
-                style={styles.input}
-                value={quantityAmount}
-                onChangeText={setQuantityAmount}
-                keyboardType="decimal-pad"
-                placeholder="12"
-                placeholderTextColor={colors.textMuted}
-                autoFocus
-              />
+        <KeyboardAwareScrollView
+          style={styles.quantityModalScroll}
+          contentContainerStyle={StyleSheet.flatten(styles.quantityModalScrollContent)}
+          keyboardShouldPersistTaps="handled"
+          enableOnAndroid
+          extraScrollHeight={80}
+          keyboardOpeningTime={0}
+        >
+          <Card style={styles.quantityModalCard}>
+            <Text style={styles.quantityModalTitle}>Add {pendingIngredient?.name}</Text>
+            <View style={styles.servingSizeRow}>
+              <View style={styles.servingAmountField}>
+                <Text style={styles.fieldLabel}>Amount</Text>
+                <TextInput
+                  style={styles.input}
+                  value={quantityAmount}
+                  onChangeText={setQuantityAmount}
+                  keyboardType="decimal-pad"
+                  placeholder="12"
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
+                />
+              </View>
+              <View style={styles.servingUnitField}>
+                <Text style={styles.fieldLabel}>Unit</Text>
+                <TextInput
+                  style={styles.input}
+                  value={quantityUnit}
+                  onChangeText={setQuantityUnit}
+                  placeholder="g, oz, ml, lb…"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
             </View>
-            <View style={styles.servingUnitField}>
-              <Text style={styles.fieldLabel}>Unit</Text>
-              <TextInput
-                style={styles.input}
-                value={quantityUnit}
-                onChangeText={setQuantityUnit}
-                placeholder="g, oz, ml, lb…"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-          {quantityError && <Text style={styles.errorText}>{quantityError}</Text>}
-          <View style={styles.actionsRow}>
-            <AppButton
-              title="Cancel"
-              variant="secondary"
-              onPress={() => setPendingIngredient(null)}
-              style={styles.actionButton}
+
+            <Text style={styles.sectionLabel}>
+              NUTRITION (PER {pendingIngredient?.servingAmount} {pendingIngredient?.servingUnit})
+            </Text>
+            <Field
+              label="Calories"
+              value={nutritionDraft.calories}
+              onChangeText={(v) => setNutritionField('calories', v)}
+              keyboardType="decimal-pad"
             />
-            <AppButton title="Add to Recipe" onPress={confirmAddIngredient} style={styles.actionButton} />
-          </View>
-        </Card>
+            <Field
+              label="Protein (g)"
+              value={nutritionDraft.proteinG}
+              onChangeText={(v) => setNutritionField('proteinG', v)}
+              keyboardType="decimal-pad"
+            />
+            <Field
+              label="Carbs (g)"
+              value={nutritionDraft.carbsG}
+              onChangeText={(v) => setNutritionField('carbsG', v)}
+              keyboardType="decimal-pad"
+            />
+            <Field
+              label="Fat (g)"
+              value={nutritionDraft.fatG}
+              onChangeText={(v) => setNutritionField('fatG', v)}
+              keyboardType="decimal-pad"
+            />
+            <Field
+              label="Fiber (g)"
+              value={nutritionDraft.fiberG}
+              onChangeText={(v) => setNutritionField('fiberG', v)}
+              keyboardType="decimal-pad"
+            />
+            <Field
+              label="Sugar (g)"
+              value={nutritionDraft.sugarG}
+              onChangeText={(v) => setNutritionField('sugarG', v)}
+              keyboardType="decimal-pad"
+            />
+            <Field
+              label="Sodium (mg)"
+              value={nutritionDraft.sodiumMg}
+              onChangeText={(v) => setNutritionField('sodiumMg', v)}
+              keyboardType="decimal-pad"
+            />
+
+            {quantityError && <Text style={styles.errorText}>{quantityError}</Text>}
+            <View style={styles.actionsRow}>
+              <AppButton
+                title="Cancel"
+                variant="secondary"
+                onPress={() => setPendingIngredient(null)}
+                disabled={savingIngredient}
+                style={styles.actionButton}
+              />
+              <AppButton
+                title={savingIngredient ? 'Saving…' : 'Add to Recipe'}
+                onPress={confirmAddIngredient}
+                disabled={savingIngredient}
+                style={styles.actionButton}
+              />
+            </View>
+          </Card>
+        </KeyboardAwareScrollView>
       </View>
     </Modal>
     </>
@@ -598,9 +727,15 @@ const styles = StyleSheet.create({
   },
   quantityModalOverlay: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  quantityModalScroll: {
+    flex: 1,
+  },
+  quantityModalScrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
     padding: spacing.lg,
   },
   quantityModalCard: {
