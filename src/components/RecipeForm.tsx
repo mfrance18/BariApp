@@ -379,6 +379,20 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   }
 
   async function handleSubmit() {
+    // Validate the cheap fields first, before doing anything that writes to
+    // the database — a recipe that can't be saved anyway (e.g. missing a
+    // name) shouldn't still end up creating its pending ingredients as
+    // library foods.
+    if (!name.trim()) {
+      setError('Name is required');
+      return;
+    }
+    const servingsNum = Number(servings);
+    if (!servingsNum || servingsNum <= 0) {
+      setError('Servings must be greater than 0');
+      return;
+    }
+
     // Ingredients resolved from OFF/scanning that aren't in the library yet
     // (negative placeholder id) are only written to the database now, right
     // before the recipe itself is saved.
@@ -437,8 +451,23 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       keyboardOpeningTime={0}
     >
       <Card style={styles.card}>
-        <Field label="Name" value={name} onChangeText={setName} />
-        <Field label="Servings" value={servings} onChangeText={setServings} keyboardType="decimal-pad" />
+        <Field
+          label="Name"
+          value={name}
+          onChangeText={(v) => {
+            setName(v);
+            setError(null);
+          }}
+        />
+        <Field
+          label="Servings"
+          value={servings}
+          onChangeText={(v) => {
+            setServings(v);
+            setError(null);
+          }}
+          keyboardType="decimal-pad"
+        />
         <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
       </Card>
 
