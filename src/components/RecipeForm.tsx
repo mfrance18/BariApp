@@ -121,7 +121,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
 
   /** Returns an error message if the food couldn't be added (not a weighable unit), or null on success. */
   function addIngredient(food: Food): string | null {
-    if (!isWeighableUnit(food.servingUnit)) {
+    if (!isWeighableUnit(food.servingUnit) && food.servingWeightG == null) {
       const message = `${food.name} is logged as "${food.servingAmount} ${food.servingUnit}", not a weight, so it can't be used in a recipe.`;
       setError(message);
       return message;

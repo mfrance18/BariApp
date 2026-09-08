@@ -7,7 +7,10 @@ import { createFood } from '../../src/db/repositories/foodsRepo';
 
 export default function NewFoodScreen() {
   const params = useLocalSearchParams<
-    Partial<Record<keyof FoodFormValues | 'source', string>> & { logMealType?: string; logDate?: string }
+    Partial<Record<keyof FoodFormValues | 'source' | 'servingWeightG', string>> & {
+      logMealType?: string;
+      logDate?: string;
+    }
   >();
   const queryClient = useQueryClient();
 
@@ -18,6 +21,8 @@ export default function NewFoodScreen() {
     brand: params.brand ?? '',
     servingAmount: params.servingAmount ?? EMPTY_FOOD_FORM_VALUES.servingAmount,
     servingUnit: params.servingUnit ?? EMPTY_FOOD_FORM_VALUES.servingUnit,
+    servingWeightAmount: params.servingWeightG ?? '',
+    servingWeightUnit: params.servingWeightG ? 'g' : '',
     calories: params.calories ?? '',
     proteinG: params.proteinG ?? '',
     carbsG: params.carbsG ?? '',

@@ -71,6 +71,7 @@ export function navigateToPrefilledFoodForm(
       brand: food.brand ?? '',
       servingAmount: String(food.servingAmount),
       servingUnit: food.servingUnit,
+      servingWeightG: food.servingWeightG != null ? String(food.servingWeightG) : '',
       calories: String(food.calories),
       proteinG: String(food.proteinG),
       carbsG: String(food.carbsG),

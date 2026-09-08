@@ -48,6 +48,15 @@ describe('getReferenceWeightG', () => {
   it('throws for a discrete, non-weighable unit', () => {
     expect(() => getReferenceWeightG({ servingAmount: 1, servingUnit: 'bottle' })).toThrow();
   });
+
+  it('falls back to servingWeightG for a discrete unit with a captured weight equivalent', () => {
+    expect(getReferenceWeightG({ servingAmount: 1, servingUnit: 'bottle', servingWeightG: 355 })).toBe(355);
+  });
+
+  it('still throws when servingWeightG is null or non-positive', () => {
+    expect(() => getReferenceWeightG({ servingAmount: 1, servingUnit: 'bottle', servingWeightG: null })).toThrow();
+    expect(() => getReferenceWeightG({ servingAmount: 1, servingUnit: 'bottle', servingWeightG: 0 })).toThrow();
+  });
 });
 
 describe('scaleNutrition', () => {

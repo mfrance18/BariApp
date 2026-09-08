@@ -30,6 +30,8 @@ describe('mapOffProductToFood', () => {
     expect(food.calories).toBe(97);
     expect(food.proteinG).toBe(9);
     expect(food.sodiumMg).toBeCloseTo(36);
+    // "g" is already weighable, so no fallback weight equivalent is needed.
+    expect(food.servingWeightG).toBeNull();
   });
 
   it('falls back to converting energy_100g (kJ) when kcal is missing', () => {
@@ -77,6 +79,9 @@ describe('mapOffProductToFood', () => {
     expect(food.servingUnit).toBe('bottle');
     expect(food.calories).toBe(0);
     expect(food.sodiumMg).toBeCloseTo(270);
+    // "bottle" isn't weighable, but OFF told us the serving's weight — capture
+    // it as a fallback so this food can still be used in recipes / weighed.
+    expect(food.servingWeightG).toBe(591);
   });
 
   it('scales per-100g values to the serving size when OFF has no per-serving nutrients', () => {
@@ -102,5 +107,6 @@ describe('mapOffProductToFood', () => {
     expect(food.calories).toBeCloseTo(108);
     expect(food.carbsG).toBeCloseTo(24);
     expect(food.sodiumMg).toBeCloseTo(2);
+    expect(food.servingWeightG).toBe(240);
   });
 });

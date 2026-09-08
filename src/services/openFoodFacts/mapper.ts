@@ -1,5 +1,6 @@
 import type { NewFood } from '../../db/repositories/foodsRepo';
 import { roundNutritionForDisplay, type NutritionFields } from '../nutrition/scaling';
+import { isWeighableUnit } from '../../utils/servingUnits';
 import type { OffProduct } from './types';
 
 const KJ_TO_KCAL = 4.184;
@@ -85,6 +86,14 @@ export function mapOffProductToFood(product: OffProduct, barcode: string): OffFo
 
   const rounded = roundNutritionForDisplay(nutrition);
 
+  // Capture OFF's known serving weight as a fallback reference even when the
+  // label itself is a discrete unit (e.g. "1 bottle") — lets the food still
+  // be used in recipes / weighed when logging. See getReferenceWeightG.
+  const servingWeightG =
+    !isWeighableUnit(servingUnit) && product.serving_quantity && product.serving_quantity > 0
+      ? product.serving_quantity
+      : null;
+
   return {
     name: product.product_name?.trim() || 'Unknown product',
     brand: product.brands?.split(',')[0]?.trim() || null,
@@ -92,6 +101,7 @@ export function mapOffProductToFood(product: OffProduct, barcode: string): OffFo
     source: 'open_food_facts',
     servingAmount,
     servingUnit,
+    servingWeightG,
     calories: rounded.calories,
     proteinG: rounded.proteinG,
     carbsG: rounded.carbsG,

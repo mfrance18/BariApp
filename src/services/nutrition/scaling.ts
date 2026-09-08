@@ -25,21 +25,30 @@ const NUTRITION_KEYS = Object.keys(ZERO_NUTRITION) as (keyof NutritionFields)[];
 export interface FoodBasis {
   servingAmount: number;
   servingUnit: string;
+  /**
+   * Optional manual weight equivalent (in grams) for one servingAmount of
+   * servingUnit, e.g. "1 bottle" = 355g. Used as a fallback reference weight
+   * when servingUnit itself isn't a recognized weight/volume unit, so a food
+   * logged as a discrete count can still be used in recipes / scale logging.
+   */
+  servingWeightG?: number | null;
 }
 
 /**
  * The weight (in grams) that a food's stored nutrition values are relative
- * to — only defined when servingUnit resolves to a weight/volume unit (see
- * src/utils/servingUnits.ts). Foods with a discrete unit (e.g. "bottle",
- * "scoop") aren't weighable and can't be used where a gram reference is
- * required (recipes, scale-based logging).
+ * to — either servingUnit resolving to a weight/volume unit (see
+ * src/utils/servingUnits.ts), or a manually captured servingWeightG for a
+ * discrete unit (e.g. "bottle", "scoop"). Throws if neither is available.
  */
 export function getReferenceWeightG(food: FoodBasis): number {
   const grams = servingToGrams(food.servingAmount, food.servingUnit);
-  if (grams == null || grams <= 0) {
-    throw new Error(`"${food.servingUnit}" isn't a weighable unit`);
+  if (grams != null && grams > 0) {
+    return grams;
   }
-  return grams;
+  if (food.servingWeightG != null && food.servingWeightG > 0) {
+    return food.servingWeightG;
+  }
+  throw new Error(`"${food.servingUnit}" isn't a weighable unit`);
 }
 
 /** Scales a nutrition basis (per referenceWeightG) to the measured weight. */

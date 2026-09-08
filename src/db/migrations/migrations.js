@@ -5,6 +5,7 @@ import m0000 from './0000_mysterious_blob.sql';
 import m0001 from './0001_aromatic_the_watchers.sql';
 import m0002 from './0002_serving_amount_unit.sql';
 import m0003 from './0003_meal_log_quantity.sql';
+import m0004 from './0004_serving_weight_g.sql';
 
   export default {
     journal,
@@ -12,6 +13,7 @@ import m0003 from './0003_meal_log_quantity.sql';
       m0000,
 m0001,
 m0002,
-m0003
+m0003,
+m0004
     }
   }

@@ -13,6 +13,8 @@ function foodToFormValues(food: Food): FoodFormValues {
     barcode: food.barcode ?? '',
     servingAmount: String(food.servingAmount),
     servingUnit: food.servingUnit,
+    servingWeightAmount: food.servingWeightG != null ? String(food.servingWeightG) : '',
+    servingWeightUnit: food.servingWeightG != null ? 'g' : '',
     calories: String(food.calories),
     proteinG: String(food.proteinG),
     carbsG: String(food.carbsG),

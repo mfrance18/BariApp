@@ -15,6 +15,8 @@ export interface FoodFormValues {
   barcode: string;
   servingAmount: string;
   servingUnit: string;
+  servingWeightAmount: string;
+  servingWeightUnit: string;
   calories: string;
   proteinG: string;
   carbsG: string;
@@ -31,6 +33,8 @@ export const EMPTY_FOOD_FORM_VALUES: FoodFormValues = {
   barcode: '',
   servingAmount: '1',
   servingUnit: '',
+  servingWeightAmount: '',
+  servingWeightUnit: '',
   calories: '',
   proteinG: '',
   carbsG: '',
@@ -47,6 +51,7 @@ export interface ParsedFoodValues {
   barcode: string | null;
   servingAmount: number;
   servingUnit: string;
+  servingWeightG: number | null;
   calories: number;
   proteinG: number;
   carbsG: number;
@@ -68,13 +73,28 @@ export function parseFoodFormValues(values: FoodFormValues): ParsedFoodValues | 
   if (!values.servingUnit.trim()) {
     return { error: 'Enter a serving unit (e.g. g, oz, bottle, scoop)' };
   }
+  const servingUnit = values.servingUnit.trim();
+  let servingWeightG: number | null = null;
+  if (!isWeighableUnit(servingUnit) && values.servingWeightAmount.trim()) {
+    const weightAmount = Number(values.servingWeightAmount);
+    if (!weightAmount || weightAmount <= 0) {
+      return { error: 'Weight equivalent amount must be greater than 0' };
+    }
+    const weightUnit = values.servingWeightUnit.trim() || 'g';
+    const grams = servingToGrams(weightAmount, weightUnit);
+    if (grams == null) {
+      return { error: `"${weightUnit}" isn't a recognized weight unit (try g, oz, lb, kg, ml)` };
+    }
+    servingWeightG = grams;
+  }
   const num = (s: string) => (s.trim() ? Number(s) : 0);
   return {
     name: values.name.trim(),
     brand: values.brand.trim() || null,
     barcode: values.barcode.trim() || null,
     servingAmount,
-    servingUnit: values.servingUnit.trim(),
+    servingUnit,
+    servingWeightG,
     calories: num(values.calories),
     proteinG: num(values.proteinG),
     carbsG: num(values.carbsG),
@@ -206,6 +226,38 @@ export function FoodForm({
             />
           </View>
         </View>
+
+        {!isWeighableUnit(values.servingUnit) && (
+          <View style={styles.weightEquivalent}>
+            <Text style={styles.fieldLabel}>Weight equivalent (optional)</Text>
+            <View style={styles.servingSizeRow}>
+              <View style={styles.servingAmountField}>
+                <TextInput
+                  style={styles.input}
+                  value={values.servingWeightAmount}
+                  onChangeText={(v) => set('servingWeightAmount', v)}
+                  keyboardType="decimal-pad"
+                  placeholder="12"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+              <View style={styles.servingUnitField}>
+                <TextInput
+                  style={styles.input}
+                  value={values.servingWeightUnit}
+                  onChangeText={(v) => set('servingWeightUnit', v)}
+                  placeholder="oz, g, ml…"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                />
+              </View>
+            </View>
+            <Text style={styles.helperCaption}>
+              e.g. if 1 {values.servingUnit.trim() || 'unit'} weighs 12 oz, this lets it be used in recipes and weighed
+              when logging.
+            </Text>
+          </View>
+        )}
       </Card>
 
       <Card style={styles.card}>
@@ -326,6 +378,9 @@ const styles = StyleSheet.create({
   },
   servingUnitField: {
     flex: 2,
+    gap: spacing.xs,
+  },
+  weightEquivalent: {
     gap: spacing.xs,
   },
   errorText: {

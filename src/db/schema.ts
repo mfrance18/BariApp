@@ -22,6 +22,11 @@ export const foods = sqliteTable(
     // weight/volume unit — see src/utils/servingUnits.ts.
     servingAmount: real('serving_amount').notNull().default(1),
     servingUnit: text('serving_unit').notNull().default('g'),
+    // Optional weight equivalent (in grams) of one servingAmount/servingUnit,
+    // for foods whose serving unit isn't itself weighable (e.g. "1 bottle").
+    // Lets such a food still be used in recipes / weighed when logging — see
+    // getReferenceWeightG in src/services/nutrition/scaling.ts.
+    servingWeightG: real('serving_weight_g'),
     calories: real('calories').notNull().default(0),
     proteinG: real('protein_g').notNull().default(0),
     carbsG: real('carbs_g').notNull().default(0),

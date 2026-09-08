@@ -86,7 +86,13 @@ export default function WeighScreen() {
     enabled: itemType === 'recipe',
   });
 
-  const isCountBased = itemType === 'food' && !!foodQuery.data && !isWeighableUnit(foodQuery.data.servingUnit);
+  // A food with a captured weight equivalent (e.g. "1 bottle" = 355g) can be
+  // weighed directly even though its own serving unit is a discrete count.
+  const isCountBased =
+    itemType === 'food' &&
+    !!foodQuery.data &&
+    !isWeighableUnit(foodQuery.data.servingUnit) &&
+    foodQuery.data.servingWeightG == null;
 
   useEffect(() => {
     if (!existingEntryQuery.data) return;

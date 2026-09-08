@@ -29,6 +29,13 @@
       "when": 1788831500000,
       "tag": "0003_meal_log_quantity",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1788835000000,
+      "tag": "0004_serving_weight_g",
+      "breakpoints": true
     }
   ]
 }
