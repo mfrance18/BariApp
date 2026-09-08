@@ -205,6 +205,8 @@ interface RawScaleReading {
   weightG?: number;
   bodyFat?: number;
   time?: number;
+  timestamp?: number;
+  subUserID?: string | number;
   id?: string | number;
 }
 
@@ -218,70 +220,105 @@ export function normalizeWeightToKg(raw: number): number {
 function toWeightReading(raw: RawScaleReading, fallbackId: string): WeightReading | null {
   const rawWeight = raw.weight ?? raw.weightG;
   if (rawWeight == null) return null;
+  const rawTime = raw.time ?? raw.timestamp;
   return {
     weightKg: normalizeWeightToKg(rawWeight),
-    timestamp: raw.time ? new Date(raw.time * 1000) : new Date(),
+    timestamp: rawTime ? new Date(rawTime * 1000) : new Date(),
     bodyFatPct: raw.bodyFat,
-    externalId: raw.id != null ? String(raw.id) : fallbackId,
+    externalId:
+      raw.id != null
+        ? String(raw.id)
+        : rawTime != null
+          ? `${fallbackId}-${raw.subUserID ?? 0}-${rawTime}`
+          : fallbackId,
   };
 }
 
 /**
- * VeSync's current bypassV2 protocol (confirmed against pyvesync's device
- * command mixin, which doesn't itself support scales but uses this same
- * envelope for every other device category) wraps the actual command in a
- * nested `payload: { method, source, data }` object, and duplicates the
- * device id under both its old (`cid`/`configModule`) and new
- * (`deviceId`/`configModel`) field names. No open-source project has
- * reverse-engineered the scale-specific `payload.method` command name or
- * response shape, so `getWeighingDataV2` and the RawScaleReading fields
- * below remain a best-effort guess — check DEBUG_LOG_RAW_RESPONSES output
- * if this still fails.
+ * VeSync's smart scale is NOT one of the device categories pyvesync
+ * itself supports (confirmed against its device_map.py), so unlike
+ * login/device-list there is no maintained reference implementation for
+ * scale reads — the scale doesn't go through the generic bypassV2 device
+ * command mechanism used by plugs/bulbs/etc at all. This is assembled from
+ * two independent, unverified community reports about VeSync's fitness
+ * scale line, tried in order:
+ *  1. `/cloud/v2/deviceManaged/getWeighingDataV2` — a flat-body request
+ *     (page/pageSize/allData/debugMode/configModule) documented in an open
+ *     (unmerged) pyvesync PR adding ESF24 scale support, returning
+ *     `result.weightDatas: [{ subUserID, timestamp, weightG }]`.
+ *  2. `/cloud/v1/deviceManaged/fatScale/getWeighData` — referenced in a
+ *     pyvesync GitHub issue by someone who packet-captured the real app
+ *     talking to it for an ESF00+ scale, but no body/response shape was
+ *     ever shared, so this fallback's body is a best-effort guess built
+ *     from the fields every other endpoint in this file uses.
+ * Check DEBUG_LOG_RAW_RESPONSES output for both if scale reads keep failing.
  */
-async function bypassCommand<T>(
-  session: VeSyncSession,
-  device: VeSyncDevice,
-  payloadMethod: string,
-  data: Record<string, unknown> = {},
-): Promise<T | null> {
-  const response = await postJson<{ result?: T }>('/cloud/v1/deviceManaged/bypassV2', {
-    method: 'bypassV2',
-    accountID: session.accountId,
-    token: session.token,
-    cid: device.cid,
-    deviceId: device.cid,
-    configModule: device.configModule,
-    configModel: device.configModule,
-    acceptLanguage: ACCEPT_LANGUAGE,
-    appVersion: APP_VERSION,
-    phoneBrand: PHONE_BRAND,
-    phoneOS: PHONE_OS,
-    timeZone: TIME_ZONE,
-    userCountryCode: REGION,
-    debugMode: false,
-    traceId: newTraceId(session.terminalId),
-    payload: { method: payloadMethod, source: 'APP', data },
-  });
+async function fetchWeighingData(session: VeSyncSession, device: VeSyncDevice): Promise<RawScaleReading[]> {
+  const v2Response = await postJson<{ weightDatas?: RawScaleReading[] }>(
+    '/cloud/v2/deviceManaged/getWeighingDataV2',
+    {
+      method: 'getWeighingDataV2',
+      accountID: session.accountId,
+      token: session.token,
+      configModule: device.configModule,
+      timeZone: TIME_ZONE,
+      appVersion: APP_VERSION,
+      phoneBrand: PHONE_BRAND,
+      phoneOS: PHONE_OS,
+      acceptLanguage: ACCEPT_LANGUAGE,
+      traceId: newTraceId(session.terminalId),
+      pageSize: 100,
+      page: 1,
+      debugMode: false,
+      allData: true,
+    },
+  );
 
-  logDebug(`bypassV2 ${payloadMethod} response`, response);
+  logDebug('getWeighingDataV2 response', v2Response);
 
-  if (response.code !== 0) {
-    if (response.code === -11201022 || response.code === -11012022) {
-      throw new VeSyncAuthError(response.msg ?? 'VeSync session expired');
-    }
-    return null;
+  if (v2Response.code === -11201022 || v2Response.code === -11012022) {
+    throw new VeSyncAuthError(v2Response.msg ?? 'VeSync session expired');
+  }
+  if (v2Response.code === 0 && v2Response.result?.weightDatas) {
+    return v2Response.result.weightDatas;
   }
 
-  return response.result?.result ?? null;
+  const fatScaleResponse = await postJson<{ weightDatas?: RawScaleReading[]; items?: RawScaleReading[] }>(
+    '/cloud/v1/deviceManaged/fatScale/getWeighData',
+    {
+      method: 'getWeighData',
+      accountID: session.accountId,
+      token: session.token,
+      cid: device.cid,
+      configModule: device.configModule,
+      timeZone: TIME_ZONE,
+      appVersion: APP_VERSION,
+      phoneBrand: PHONE_BRAND,
+      phoneOS: PHONE_OS,
+      acceptLanguage: ACCEPT_LANGUAGE,
+      traceId: newTraceId(session.terminalId),
+    },
+  );
+
+  logDebug('fatScale/getWeighData response', fatScaleResponse);
+
+  if (fatScaleResponse.code === -11201022 || fatScaleResponse.code === -11012022) {
+    throw new VeSyncAuthError(fatScaleResponse.msg ?? 'VeSync session expired');
+  }
+  if (fatScaleResponse.code === 0) {
+    return fatScaleResponse.result?.weightDatas ?? fatScaleResponse.result?.items ?? [];
+  }
+
+  return [];
 }
 
 export async function getLatestScaleReading(
   session: VeSyncSession,
   device: VeSyncDevice,
 ): Promise<WeightReading | null> {
-  const result = await bypassCommand<RawScaleReading>(session, device, 'getWeighingDataV2');
-  if (!result) return null;
-  return toWeightReading(result, `${device.cid}-latest`);
+  const readings = await getScaleWeightHistory(session, device, new Date(0));
+  if (readings.length === 0) return null;
+  return readings.reduce((latest, r) => (r.timestamp > latest.timestamp ? r : latest));
 }
 
 export async function getScaleWeightHistory(
@@ -289,19 +326,9 @@ export async function getScaleWeightHistory(
   device: VeSyncDevice,
   sinceDate: Date,
 ): Promise<WeightReading[]> {
-  const result = await bypassCommand<{ items?: RawScaleReading[] }>(session, device, 'getWeighingDataV2', {
-    beginDay: sinceDate.toISOString().slice(0, 10).replace(/-/g, ''),
-    endDay: new Date().toISOString().slice(0, 10).replace(/-/g, ''),
-  });
-
-  const items = result?.items;
-  if (!items || items.length === 0) {
-    // History query shape is unconfirmed — fall back to at least the latest single reading.
-    const latest = await getLatestScaleReading(session, device);
-    return latest ? [latest] : [];
-  }
+  const items = await fetchWeighingData(session, device);
 
   return items
     .map((item, index) => toWeightReading(item, `${device.cid}-${index}`))
-    .filter((r): r is WeightReading => r !== null);
+    .filter((r): r is WeightReading => r !== null && r.timestamp >= sinceDate);
 }
