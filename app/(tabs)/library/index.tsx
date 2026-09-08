@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -16,6 +16,7 @@ import { colors, radius, spacing } from '../../../src/theme/theme';
 type LibraryTab = 'foods' | 'recipes';
 
 export default function LibraryScreen() {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<LibraryTab>('foods');
   const [query, setQuery] = useState('');
 
@@ -36,7 +37,10 @@ export default function LibraryScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setQuery('');
+      if (queryClient.getQueryData(['foods', 'justAdded'])) {
+        queryClient.setQueryData(['foods', 'justAdded'], false);
+        setQuery('');
+      }
       if (activeTab === 'foods') {
         foodsQuery.refetch();
       } else {

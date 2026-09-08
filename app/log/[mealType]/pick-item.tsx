@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -17,6 +17,7 @@ import { todayLogDateKey } from '../../../src/utils/date';
 type PickTab = 'foods' | 'recipes';
 
 export default function PickItemScreen() {
+  const queryClient = useQueryClient();
   const { mealType, logDate } = useLocalSearchParams<{ mealType: string; logDate?: string }>();
   const [tab, setTab] = useState<PickTab>('foods');
   const [query, setQuery] = useState('');
@@ -40,7 +41,10 @@ export default function PickItemScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setQuery('');
+      if (queryClient.getQueryData(['foods', 'justAdded'])) {
+        queryClient.setQueryData(['foods', 'justAdded'], false);
+        setQuery('');
+      }
       if (tab === 'foods') {
         foodsQuery.refetch();
       } else {

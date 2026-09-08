@@ -32,15 +32,14 @@ export default function NewFoodScreen() {
       createFood({ ...values, source: params.source === 'open_food_facts' ? 'open_food_facts' : 'manual' }),
     onSuccess: (food) => {
       queryClient.invalidateQueries({ queryKey: ['foods'] });
+      queryClient.setQueryData(['foods', 'justAdded'], true);
       if (params.logMealType) {
         router.replace({
           pathname: '/log/[mealType]/weigh',
           params: { mealType: params.logMealType, itemType: 'food', itemId: String(food.id), logDate: params.logDate },
         });
       } else {
-        Alert.alert('Saved', `"${food.name}" (id ${food.id}) was added to your library.`, [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
+        router.back();
       }
     },
     onError: (error: Error) => {
