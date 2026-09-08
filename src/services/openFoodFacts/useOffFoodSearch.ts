@@ -12,7 +12,11 @@ export function useOffFoodSearch(query: string, enabled: boolean) {
     queryKey: ['off', 'search', debounced],
     queryFn: () => searchProductsByName(debounced),
     enabled: active,
-    retry: 1,
+    // OFF's free search endpoint has short-lived blips (503s) that a retry
+    // reliably clears — retry a few times automatically before surfacing
+    // an error the user has to act on.
+    retry: 3,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 4000),
   });
 
   return {
