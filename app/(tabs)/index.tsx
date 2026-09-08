@@ -180,7 +180,7 @@ export default function DashboardScreen() {
             <Card style={styles.medsCard}>
               <View style={styles.medsHeaderRow}>
                 <Text style={styles.mealsHeading}>Vitamins &amp; Meds</Text>
-                <TouchableOpacity onPress={() => router.push('/meds/manage')} hitSlop={8}>
+                <TouchableOpacity onPress={() => router.push('/meds')} hitSlop={8}>
                   <Ionicons name="settings-outline" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>

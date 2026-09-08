@@ -1,85 +1,68 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AppButton } from '../../src/components/ui/AppButton';
-import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } from '../../src/db/repositories/medsRepo';
-import { isNotificationsSupported } from '../../src/services/notifications/environment';
-import { ensureNotificationPermission } from '../../src/services/notifications/permissions';
-import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { formatTimeOfDay, todayLogDateKey } from '../../src/utils/date';
+import { SwipeToDelete } from '../../src/components/ui/SwipeToDelete';
+import { deleteVitaminMed, listActiveVitaminsMeds, type VitaminMed } from '../../src/db/repositories/medsRepo';
+import { rescheduleAll } from '../../src/services/notifications/scheduler';
+import { colors, radius, spacing } from '../../src/theme/theme';
 
 export default function MedsScreen() {
   const queryClient = useQueryClient();
-  const scheduledDate = todayLogDateKey();
+  const { data: meds } = useQuery({ queryKey: ['vitaminsMeds'], queryFn: listActiveVitaminsMeds });
 
-  useEffect(() => {
-    ensureNotificationPermission().catch(() => {});
-  }, []);
-
-  const { data: checklist } = useQuery({
-    queryKey: ['medsChecklist', scheduledDate],
-    queryFn: () => getTodayChecklist(scheduledDate),
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await deleteVitaminMed(id);
+      await rescheduleAll();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vitaminsMeds'] });
+      queryClient.invalidateQueries({ queryKey: ['medsChecklist'] });
+    },
+    onError: (error: Error) => Alert.alert('Could not delete', error.message),
   });
 
-  const toggleMutation = useMutation({
-    mutationFn: ({ item }: { item: TodayChecklistItem }) =>
-      item.status === 'taken'
-        ? clearStatus(item.scheduleId, scheduledDate)
-        : setStatus(item.scheduleId, scheduledDate, 'taken'),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['medsChecklist', scheduledDate] }),
-  });
+  function confirmDelete(med: VitaminMed) {
+    Alert.alert('Delete', `Permanently delete "${med.name}"? This also removes its reminder history. This cannot be undone.`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteMutation.mutate(med.id) },
+    ]);
+  }
 
   return (
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.content}
-      data={checklist ?? []}
-      keyExtractor={(item) => String(item.scheduleId)}
+      data={meds ?? []}
+      keyExtractor={(item) => String(item.id)}
       ListHeaderComponent={
-        <View style={styles.header}>
-          <Text style={styles.heading}>Today&apos;s Vitamins &amp; Meds</Text>
-          {!isNotificationsSupported && (
-            <View style={styles.noticeBox}>
-              <Text style={styles.noticeText}>
-                Reminders don&apos;t work in Expo Go — build a development build to get notifications.
-              </Text>
-            </View>
-          )}
-          <AppButton title="Manage Vitamins & Meds" variant="secondary" onPress={() => router.push('/meds/manage')} />
-        </View>
+        <AppButton title="+ Add Vitamin or Medication" onPress={() => router.push('/meds/new/edit')} />
       }
       renderItem={({ item }) => (
-        <TouchableOpacity
-          style={[styles.row, item.status === 'taken' && styles.rowTaken]}
-          onPress={() => toggleMutation.mutate({ item })}
-        >
-          <View style={styles.rowIcon}>
-            <Ionicons
-              name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
-              size={18}
-              color={item.status === 'taken' ? colors.success : colors.primary}
-            />
-          </View>
-          <View style={styles.rowTextGroup}>
-            <Text style={styles.rowName}>{item.name}</Text>
-            <Text style={styles.rowMeta}>
-              {item.dosageLabel ? `${item.dosageLabel} · ` : ''}
-              {formatTimeOfDay(item.timeOfDay)}
-            </Text>
-          </View>
-          {item.status === 'taken' ? (
-            <Ionicons name="checkmark-circle" size={24} color={colors.success} />
-          ) : (
-            <View style={styles.checkCircle} />
-          )}
-        </TouchableOpacity>
+        <SwipeToDelete onDelete={() => confirmDelete(item)}>
+          <TouchableOpacity style={styles.row} onPress={() => router.push(`/meds/${item.id}/edit`)}>
+            <View style={styles.rowIcon}>
+              <Ionicons
+                name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
+                size={18}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.rowTextGroup}>
+              <Text style={styles.rowName}>{item.name}</Text>
+              <Text style={styles.rowMeta}>
+                {item.type === 'vitamin' ? 'Vitamin' : 'Medication'}
+                {item.dosageLabel ? ` · ${item.dosageLabel}` : ''}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        </SwipeToDelete>
       )}
-      ListEmptyComponent={
-        <Text style={styles.emptyText}>Nothing scheduled for today. Add one from Manage.</Text>
-      }
+      ListEmptyComponent={<Text style={styles.emptyText}>No vitamins or medications yet</Text>}
     />
   );
 }
@@ -93,13 +76,6 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  header: {
-    gap: spacing.md,
-    marginBottom: spacing.xs,
-  },
-  heading: {
-    ...typography.title,
-  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -107,10 +83,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     padding: spacing.md,
     borderRadius: radius.md,
-    marginBottom: spacing.sm,
-  },
-  rowTaken: {
-    backgroundColor: colors.successLight,
+    marginTop: spacing.sm,
   },
   rowIcon: {
     width: 32,
@@ -132,25 +105,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
   },
-  checkCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
   emptyText: {
     color: colors.textMuted,
     textAlign: 'center',
     marginTop: 24,
-  },
-  noticeBox: {
-    backgroundColor: colors.warningLight,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-  },
-  noticeText: {
-    fontSize: 12,
-    color: colors.warning,
   },
 });
