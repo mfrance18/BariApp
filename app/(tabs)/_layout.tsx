@@ -6,6 +6,10 @@ import { colors } from '../../src/theme/theme';
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  // Guard against the safe-area inset under-reporting on some Android skins
+  // (e.g. custom nav bar overlays) — always keep at least this much clearance
+  // below the labels regardless of what the inset says.
+  const bottomInset = Math.max(insets.bottom, 16);
 
   return (
     <Tabs
@@ -19,9 +23,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopColor: colors.border,
-          height: 56 + insets.bottom,
+          height: 56 + bottomInset + 8,
           paddingTop: 8,
-          paddingBottom: insets.bottom + 8,
+          paddingBottom: bottomInset + 8,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
