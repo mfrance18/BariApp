@@ -1,10 +1,10 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '../src/components/ui/AppButton';
-import { getFoodByBarcode } from '../src/db/repositories/foodsRepo';
+import { getFoodByBarcode, restoreFood } from '../src/db/repositories/foodsRepo';
 import { getProductByBarcode } from '../src/services/openFoodFacts/client';
 import { mapOffProductToFood } from '../src/services/openFoodFacts/mapper';
 import { colors, radius, spacing } from '../src/theme/theme';
@@ -31,6 +31,10 @@ export default function ScanBarcodeScreen() {
 
     const existingFood = await getFoodByBarcode(barcode);
     if (existingFood) {
+      if (existingFood.archivedAt) {
+        await restoreFood(existingFood.id);
+        Alert.alert('Restored', `"${existingFood.name}" was previously deleted and has been restored to your library.`);
+      }
       if (logMealType) {
         router.replace({
           pathname: '/log/[mealType]/weigh',

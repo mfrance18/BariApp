@@ -54,3 +54,7 @@ export async function archiveFood(id: number): Promise<void> {
     .set({ archivedAt: new Date().toISOString() })
     .where(eq(foods.id, id));
 }
+
+export async function restoreFood(id: number): Promise<void> {
+  await db.update(foods).set({ archivedAt: null }).where(eq(foods.id, id));
+}
