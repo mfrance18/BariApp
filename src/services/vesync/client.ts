@@ -6,9 +6,14 @@ import type { VeSyncCredentials, VeSyncDevice, VeSyncSession, WeightReading } fr
  * VeSync has no official public API for third-party apps. This client
  * reimplements the same cloud protocol used internally by the VeSync
  * mobile app and reverse-engineered by projects like `pyvesync` and Home
- * Assistant's `vesync` integration: a login handshake against
+ * Assistant's `vesync` integration: a two-step login handshake against
  * smartapi.vesync.com, a device list, and a generic "bypass" command
  * mechanism used to query/control most VeSync device categories.
+ *
+ * VeSync migrated login to a two-step "authorize code" flow (see `login`
+ * below) — the older single-call `/cloud/v1/user/login` endpoint with an
+ * MD5-hashed password is deprecated and now rejected with a misleading
+ * "app version is too low" error regardless of the appVersion value sent.
  *
  * The login and device-list calls below follow the well-documented, stable
  * part of that protocol (identical across VeSync's whole device lineup).
@@ -21,16 +26,24 @@ import type { VeSyncCredentials, VeSyncDevice, VeSyncSession, WeightReading } fr
  */
 
 const BASE_URL = 'https://smartapi.vesync.com';
-// VeSync's backend rejects login requests claiming an app version below
-// some server-side minimum ("app version is too low"), which creeps up
-// over time as they ship real app updates. If login starts failing with
-// that error again, check Settings > About in the actual VeSync app on
-// your phone for its current version number and swap it in here.
-const APP_VERSION = '5.9.60';
+const APP_VERSION = '5.6.60';
+const APP_ID = 'eldodkfj';
+const CLIENT_TYPE = 'vesyncApp';
 const PHONE_BRAND = 'BariApp';
 const PHONE_OS = 'iOS';
 const USER_TYPE = '1';
 const ACCEPT_LANGUAGE = 'en';
+const REGION = 'US';
+const TIME_ZONE = 'America/New_York';
+
+/** A random per-install id VeSync's newer endpoints expect alongside terminalId. */
+let cachedMobileId: string | null = null;
+function getMobileId(): string {
+  if (!cachedMobileId) {
+    cachedMobileId = String(Math.floor(1_000_000_000_000_000 + Math.random() * 9_000_000_000_000_000));
+  }
+  return cachedMobileId;
+}
 
 /** Flip on to log raw VeSync responses to the Metro console while wiring up a real account/scale. */
 export const DEBUG_LOG_RAW_RESPONSES = true;
@@ -39,12 +52,6 @@ function logDebug(label: string, data: unknown) {
   if (DEBUG_LOG_RAW_RESPONSES) {
     console.warn(`[VeSync debug] ${label}:`, JSON.stringify(data));
   }
-}
-
-async function md5Hex(input: string): Promise<string> {
-  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.MD5, input, {
-    encoding: Crypto.CryptoEncoding.HEX,
-  });
 }
 
 export function generateTerminalId(): string {
@@ -67,50 +74,82 @@ async function postJson<T>(path: string, body: Record<string, unknown>): Promise
   return data;
 }
 
+/** Default fields VeSync's newer endpoints expect on every request, beyond the call-specific ones. */
+function defaultFields(terminalId: string) {
+  return {
+    acceptLanguage: ACCEPT_LANGUAGE,
+    appVersion: APP_VERSION,
+    appId: APP_ID,
+    clientType: CLIENT_TYPE,
+    phoneBrand: PHONE_BRAND,
+    phoneOS: PHONE_OS,
+    mobileId: getMobileId(),
+    deviceRegion: REGION,
+    countryCode: REGION,
+    userCountryCode: REGION,
+    terminalId,
+    timeZone: TIME_ZONE,
+    traceId: String(Date.now()),
+    userType: USER_TYPE,
+    debugMode: false,
+  };
+}
+
 export class VeSyncAuthError extends Error {}
 
+/**
+ * Two-step login: exchange email+password for a short-lived authorize code,
+ * then exchange that code for a session token. Replaces VeSync's old
+ * single-call, MD5-hashed-password `/cloud/v1/user/login` endpoint, which
+ * is now deprecated and rejected server-side.
+ */
 export async function login(
   credentials: VeSyncCredentials,
   terminalId: string,
 ): Promise<VeSyncSession> {
-  const hashedPassword = await md5Hex(credentials.password);
+  const authData = await postJson<{ accountID: string; authorizeCode: string }>(
+    '/globalPlatform/api/accountAuth/v1/authByPWDOrOTM',
+    {
+      ...defaultFields(terminalId),
+      email: credentials.email,
+      password: credentials.password,
+      method: 'authByPWDOrOTM',
+    },
+  );
 
-  const data = await postJson<{ token: string; accountID: string }>('/cloud/v1/user/login', {
-    email: credentials.email,
-    password: hashedPassword,
-    method: 'login',
-    acceptLanguage: ACCEPT_LANGUAGE,
-    appVersion: APP_VERSION,
-    phoneBrand: PHONE_BRAND,
-    phoneOS: PHONE_OS,
-    terminalId,
-    timeZone: 'America/New_York',
-    traceId: String(Date.now()),
-    userType: USER_TYPE,
-    devToken: '',
-  });
+  logDebug('authByPWDOrOTM response', authData);
 
-  logDebug('login response', data);
-
-  if (data.code !== 0 || !data.result) {
-    throw new VeSyncAuthError(data.msg ?? 'VeSync login failed');
+  if (authData.code !== 0 || !authData.result) {
+    throw new VeSyncAuthError(authData.msg ?? 'VeSync login failed');
   }
 
-  return { token: data.result.token, accountId: data.result.accountID, terminalId };
+  const { authorizeCode } = authData.result;
+
+  const loginData = await postJson<{ token: string; accountID: string }>(
+    '/user/api/accountManage/v1/loginByAuthorizeCode4Vesync',
+    {
+      ...defaultFields(terminalId),
+      method: 'loginByAuthorizeCode4Vesync',
+      authorizeCode,
+      emailSubscriptions: false,
+    },
+  );
+
+  logDebug('loginByAuthorizeCode4Vesync response', loginData);
+
+  if (loginData.code !== 0 || !loginData.result) {
+    throw new VeSyncAuthError(loginData.msg ?? 'VeSync login failed');
+  }
+
+  return { token: loginData.result.token, accountId: loginData.result.accountID, terminalId };
 }
 
 export async function listDevices(session: VeSyncSession): Promise<VeSyncDevice[]> {
-  const data = await postJson<{ list: VeSyncDevice[] }>('/cloud/v2/deviceManaged/devices', {
+  const data = await postJson<{ list: VeSyncDevice[] }>('/cloud/v1/deviceManaged/devices', {
+    ...defaultFields(session.terminalId),
     method: 'devices',
-    acceptLanguage: ACCEPT_LANGUAGE,
-    appVersion: APP_VERSION,
-    phoneBrand: PHONE_BRAND,
-    phoneOS: PHONE_OS,
     accountID: session.accountId,
     token: session.token,
-    terminalId: session.terminalId,
-    timeZone: 'America/New_York',
-    traceId: String(Date.now()),
     pageNo: 1,
     pageSize: 100,
   });
@@ -169,16 +208,10 @@ async function bypassCommand<T>(
   jsonCmd: Record<string, unknown>,
 ): Promise<T | null> {
   const data = await postJson<{ result?: T }>('/cloud/v1/deviceManaged/bypassV2', {
+    ...defaultFields(session.terminalId),
     method: 'bypassV2',
-    acceptLanguage: ACCEPT_LANGUAGE,
-    appVersion: APP_VERSION,
-    phoneBrand: PHONE_BRAND,
-    phoneOS: PHONE_OS,
     accountID: session.accountId,
     token: session.token,
-    terminalId: session.terminalId,
-    timeZone: 'America/New_York',
-    traceId: String(Date.now()),
     cid: device.cid,
     uuid: device.uuid,
     configModule: device.configModule,
