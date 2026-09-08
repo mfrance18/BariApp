@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Button, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } from '../../src/db/repositories/medsRepo';
+import { isNotificationsSupported } from '../../src/services/notifications/environment';
 import { ensureNotificationPermission } from '../../src/services/notifications/permissions';
 import { todayLogDateKey } from '../../src/utils/date';
 
@@ -37,6 +38,11 @@ export default function MedsScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <Text style={styles.heading}>Today&apos;s Vitamins &amp; Meds</Text>
+          {!isNotificationsSupported && (
+            <Text style={styles.noticeText}>
+              Reminders don&apos;t work in Expo Go — build a development build to get notifications.
+            </Text>
+          )}
           <Button title="Manage Vitamins & Meds" onPress={() => router.push('/meds/manage')} />
         </View>
       }
@@ -116,5 +122,12 @@ const styles = StyleSheet.create({
     color: '#888',
     textAlign: 'center',
     marginTop: 24,
+  },
+  noticeText: {
+    fontSize: 12,
+    color: '#a16207',
+    backgroundColor: '#fef9c3',
+    padding: 8,
+    borderRadius: 8,
   },
 });

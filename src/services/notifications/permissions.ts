@@ -1,9 +1,14 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+
+import { isNotificationsSupported } from './environment';
 
 export const MED_REMINDERS_CHANNEL_ID = 'med-reminders';
 
 export async function ensureNotificationPermission(): Promise<boolean> {
+  if (!isNotificationsSupported) return false;
+
+  const Notifications = await import('expo-notifications');
+
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync(MED_REMINDERS_CHANNEL_ID, {
       name: 'Vitamin & Medication Reminders',
