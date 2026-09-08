@@ -26,7 +26,14 @@ export function AppButton({ title, onPress, variant = 'primary', disabled, loadi
       {loading ? (
         <ActivityIndicator color={variant === 'primary' || variant === 'danger' ? '#fff' : colors.primary} />
       ) : (
-        <Text style={[styles.text, textVariantStyles[variant]]}>{title}</Text>
+        <Text
+          style={[styles.text, textVariantStyles[variant]]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.85}
+        >
+          {title}
+        </Text>
       )}
     </TouchableOpacity>
   );
@@ -37,6 +44,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.lg,
+    minHeight: 48,
     alignItems: 'center',
     justifyContent: 'center',
   },
