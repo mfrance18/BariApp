@@ -10,11 +10,23 @@ interface OffFoodResultsProps {
   loading: boolean;
   error?: Error | null;
   onRetry?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
   context: FoodMatchContext;
 }
 
 /** Lets the user search Open Food Facts and pick a match, alongside whatever's already in the local library. */
-export function OffFoodResults({ results, loading, error, onRetry, context }: OffFoodResultsProps) {
+export function OffFoodResults({
+  results,
+  loading,
+  error,
+  onRetry,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  context,
+}: OffFoodResultsProps) {
   async function handlePress(product: OffProduct) {
     const handledExisting = await navigateToExistingFoodByBarcode(product.code, context);
     if (!handledExisting) {
@@ -64,6 +76,14 @@ export function OffFoodResults({ results, loading, error, onRetry, context }: Of
           <Text style={styles.addLabel}>Add</Text>
         </TouchableOpacity>
       ))}
+      {hasMore &&
+        (loadingMore ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.primary} />
+          </View>
+        ) : (
+          onLoadMore && <AppButton title="Load More" variant="secondary" onPress={onLoadMore} />
+        ))}
     </View>
   );
 }

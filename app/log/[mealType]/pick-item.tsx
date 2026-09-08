@@ -146,6 +146,9 @@ export default function PickItemScreen() {
                   loading={offSearch.loading}
                   error={offSearch.error}
                   onRetry={offSearch.retry}
+                  hasMore={offSearch.hasMore}
+                  loadingMore={offSearch.loadingMore}
+                  onLoadMore={offSearch.loadMore}
                   context={{ destination: '/food/new', logMealType: mealType, logDate: effectiveLogDate }}
                 />
               </View>

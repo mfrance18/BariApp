@@ -126,6 +126,9 @@ export default function LibraryScreen() {
                   loading={offSearch.loading}
                   error={offSearch.error}
                   onRetry={offSearch.retry}
+                  hasMore={offSearch.hasMore}
+                  loadingMore={offSearch.loadingMore}
+                  onLoadMore={offSearch.loadMore}
                   context={{ destination: '/food/new' }}
                 />
               </View>

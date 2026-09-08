@@ -42,27 +42,44 @@ function productHaystack(product: OffProduct): string {
 }
 
 /**
- * Searches products by name (free-text). Returns [] only when the search
- * genuinely found nothing — network/parse failures throw instead of being
- * swallowed, so a caller (e.g. a react-query queryFn) can tell "no matches"
- * apart from "the request failed" rather than showing both identically.
+ * Ranks a brand match above a name match above the words just being
+ * scattered across name+brand — so searching a brand name (e.g. "Simply")
+ * puts that brand's products first, while a generic multi-word search (e.g.
+ * "orange juice", which rarely matches a brand field literally) falls
+ * through to ranking by name.
+ */
+function matchTier(product: OffProduct, normalizedPhrase: string): number {
+  if (normalizeForMatch(product.brands ?? '').includes(normalizedPhrase)) return 0;
+  if (productHaystack(product).includes(normalizedPhrase)) return 1;
+  return 2;
+}
+
+export interface OffSearchPage {
+  products: OffProduct[];
+  /** True if OFF's own result set for this query likely has more beyond this page. */
+  hasMore: boolean;
+}
+
+/**
+ * Searches products by name (free-text), one page at a time. Returns an
+ * empty, non-more page only when the search genuinely found nothing —
+ * network/parse failures throw instead of being swallowed, so a caller
+ * (e.g. a react-query queryFn) can tell "no matches" apart from "the
+ * request failed" rather than showing both identically.
  *
  * OFF's own search matches loosely (it can surface a product via a
  * category, ingredients text, or other field this app never shows, so a
  * result can look completely unrelated to what was typed). Treat OFF as a
- * candidate source only: fetch a larger pool, then keep just the products
- * where every word of the query actually appears — as a substring,
- * ignoring spacing/punctuation — in the SAME text the user sees (name and
- * brand only, deliberately not category/generic-name/etc., since matching
- * through a field the row doesn't display is indistinguishable from a
- * wrong result to the user), and rank an exact contiguous phrase match
- * above a same-words-anywhere match.
+ * candidate source only: fetch a page of candidates, then keep just the
+ * products where every word of the query actually appears — as a
+ * substring, ignoring spacing/punctuation — in the same text the user sees
+ * (name and brand only), ranked with matchTier above.
  */
-export async function searchProductsByName(query: string, limit = 24): Promise<OffProduct[]> {
+export async function searchProductsByName(query: string, page = 1, pageSize = 40): Promise<OffSearchPage> {
   const trimmed = query.trim();
-  if (!trimmed) return [];
+  if (!trimmed) return { products: [], hasMore: false };
   const queryWords = trimmed.split(/\s+/).map(normalizeForMatch).filter(Boolean);
-  if (queryWords.length === 0) return [];
+  if (queryWords.length === 0) return { products: [], hasMore: false };
   const normalizedPhrase = queryWords.join('');
 
   const params = new URLSearchParams({
@@ -70,33 +87,35 @@ export async function searchProductsByName(query: string, limit = 24): Promise<O
     search_simple: '1',
     action: 'process',
     json: '1',
-    // For a broad/common query (a well-known brand name, a generic category
-    // like "orange juice") OFF can have thousands of matches; without a
-    // relevance hint its own ordering is unpredictable and a specific
-    // well-known product can miss a small page entirely before our own
-    // filtering below even runs. Bias toward well-known (heavily-scanned)
-    // products and fetch a much larger pool so this app's own filter has
-    // enough to work with.
+    // Bias toward well-known (heavily-scanned) products — for a broad query
+    // (a brand name, a generic category) OFF can have thousands of matches,
+    // and without this a specific well-known product can miss the page
+    // entirely before this app's own filtering below even runs.
     sort_by: 'unique_scans_n',
     fields: FIELDS,
-    page_size: '100',
+    page_size: String(pageSize),
+    page: String(page),
   });
   const response = await fetch(`${DOMAIN}/cgi/search.pl?${params.toString()}`, { headers: OFF_HEADERS });
   if (!response.ok) {
     throw new Error(`Open Food Facts search failed (${response.status})`);
   }
   const data = (await response.json()) as OffSearchResponse;
-  const candidates = (data.products ?? []).filter((p) => p.code && p.product_name);
+  const rawCandidates = data.products ?? [];
+  const candidates = rawCandidates.filter((p) => p.code && p.product_name);
 
   const matches = candidates
     .map((product) => {
       const haystack = productHaystack(product);
       if (!queryWords.every((word) => haystack.includes(word))) return null;
-      return { product, exactPhrase: haystack.includes(normalizedPhrase) };
+      return { product, tier: matchTier(product, normalizedPhrase) };
     })
-    .filter((entry): entry is { product: OffProduct; exactPhrase: boolean } => entry !== null);
+    .filter((entry): entry is { product: OffProduct; tier: number } => entry !== null);
 
-  matches.sort((a, b) => Number(b.exactPhrase) - Number(a.exactPhrase));
+  matches.sort((a, b) => a.tier - b.tier);
 
-  return matches.slice(0, limit).map((entry) => entry.product);
+  return {
+    products: matches.map((entry) => entry.product),
+    hasMore: rawCandidates.length >= pageSize,
+  };
 }
