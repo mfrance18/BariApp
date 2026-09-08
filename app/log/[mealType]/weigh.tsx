@@ -252,12 +252,12 @@ export default function WeighScreen() {
                 options={WEIGHT_UNIT_OPTIONS}
                 value={weightUnit}
                 onChange={(unit) => {
-                  const grams = servingToGrams(Number(weightInput), weightUnit);
-                  if (grams != null && weightInput !== '') {
-                    const converted = gramsToServing(grams, unit);
-                    if (converted != null) {
-                      setWeightInput(String(Math.round(converted * 100) / 100));
-                    }
+                  const trimmed = weightInput.trim();
+                  const amount = Number(trimmed);
+                  if (trimmed !== '' && !Number.isNaN(amount) && amount > 0) {
+                    const grams = servingToGrams(amount, weightUnit);
+                    const converted = grams != null ? gramsToServing(grams, unit) : null;
+                    setWeightInput(converted != null ? String(Math.round(converted * 100) / 100) : trimmed);
                   }
                   setWeightUnit(unit);
                 }}
