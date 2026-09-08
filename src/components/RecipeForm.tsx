@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { KeyboardAwareFlatList } from 'react-native-keyboard-aware-scroll-view';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createFood, getFoodByBarcode, listFoods, restoreFood, type Food } from '../db/repositories/foodsRepo';
@@ -247,119 +247,117 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
 
   return (
     <>
-    <KeyboardAwareFlatList
+    <KeyboardAwareScrollView
       style={styles.container}
       contentContainerStyle={StyleSheet.flatten([styles.content, { paddingBottom: 24 + insets.bottom }])}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
       extraScrollHeight={120}
       keyboardOpeningTime={0}
-      data={ingredients}
-      keyExtractor={(item, index) => `${item.food.id}-${index}`}
-      ListHeaderComponent={
-        <View style={styles.headerFields}>
-          <Card style={styles.card}>
-            <Field label="Name" value={name} onChangeText={setName} />
-            <Field label="Servings" value={servings} onChangeText={setServings} keyboardType="decimal-pad" />
-            <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
-          </Card>
+    >
+      <Card style={styles.card}>
+        <Field label="Name" value={name} onChangeText={setName} />
+        <Field label="Servings" value={servings} onChangeText={setServings} keyboardType="decimal-pad" />
+        <Field label="Notes" value={notes} onChangeText={setNotes} multiline />
+      </Card>
 
-          <Text style={styles.sectionLabel}>INGREDIENTS</Text>
-          <AppButton
-            title="Scan Barcode"
-            variant="secondary"
-            onPress={() => {
-              setScanStatus(null);
-              setScannerVisible(true);
-            }}
-          />
-          <View style={styles.searchRow}>
-            <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
+      <Text style={styles.sectionLabel}>INGREDIENTS</Text>
+      {ingredients.length === 0 ? (
+        <Text style={styles.emptyText}>No ingredients added yet</Text>
+      ) : (
+        ingredients.map((item, index) => (
+          <View key={`${item.food.id}-${index}`} style={styles.ingredientRow}>
+            <Text style={styles.ingredientName}>{item.food.name}</Text>
             <TextInput
-              style={styles.searchInput}
-              placeholder="Search foods to add…"
-              placeholderTextColor={colors.textMuted}
-              value={searchText}
-              onChangeText={setSearchText}
+              style={styles.quantityInput}
+              value={item.quantityAmount}
+              onChangeText={(v) => setIngredientAmount(index, v)}
+              keyboardType="decimal-pad"
             />
+            <TextInput
+              style={styles.unitInput}
+              value={item.quantityUnit}
+              onChangeText={(v) => setIngredientUnit(index, v)}
+              autoCapitalize="none"
+            />
+            <TouchableOpacity onPress={() => removeIngredient(index)} hitSlop={8}>
+              <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
           </View>
-          {searchResults && searchResults.length > 0 && (
-            <Card style={styles.searchResults}>
-              {searchResults.map((food) => (
-                <TouchableOpacity key={food.id} style={styles.searchResultRow} onPress={() => requestAddIngredient(food)}>
-                  <Text style={styles.searchResultText}>{food.name}</Text>
-                  <Ionicons name="add-circle" size={20} color={colors.primary} />
-                </TouchableOpacity>
-              ))}
-            </Card>
-          )}
-          {showOffSearch && (
-            <View style={styles.offSection}>
-              <OffFoodResults
-                results={offSearch.results}
-                loading={offSearch.loading}
-                error={offSearch.error}
-                onRetry={offSearch.retry}
-                hasMore={offSearch.hasMore}
-                loadingMore={offSearch.loadingMore}
-                onLoadMore={offSearch.loadMore}
-                onSelect={handleSelectOffProduct}
-              />
-            </View>
-          )}
-        </View>
-      }
-      renderItem={({ item, index }) => (
-        <View style={styles.ingredientRow}>
-          <Text style={styles.ingredientName}>{item.food.name}</Text>
-          <TextInput
-            style={styles.quantityInput}
-            value={item.quantityAmount}
-            onChangeText={(v) => setIngredientAmount(index, v)}
-            keyboardType="decimal-pad"
+        ))
+      )}
+
+      <AppButton
+        title="Scan Barcode"
+        variant="secondary"
+        onPress={() => {
+          setScanStatus(null);
+          setScannerVisible(true);
+        }}
+      />
+      <View style={styles.searchRow}>
+        <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search foods to add…"
+          placeholderTextColor={colors.textMuted}
+          value={searchText}
+          onChangeText={setSearchText}
+        />
+      </View>
+      {searchResults && searchResults.length > 0 && (
+        <Card style={styles.searchResults}>
+          {searchResults.map((food) => (
+            <TouchableOpacity key={food.id} style={styles.searchResultRow} onPress={() => requestAddIngredient(food)}>
+              <Text style={styles.searchResultText}>{food.name}</Text>
+              <Ionicons name="add-circle" size={20} color={colors.primary} />
+            </TouchableOpacity>
+          ))}
+        </Card>
+      )}
+      {showOffSearch && (
+        <View style={styles.offSection}>
+          <OffFoodResults
+            results={offSearch.results}
+            loading={offSearch.loading}
+            error={offSearch.error}
+            onRetry={offSearch.retry}
+            hasMore={offSearch.hasMore}
+            loadingMore={offSearch.loadingMore}
+            onLoadMore={offSearch.loadMore}
+            onSelect={handleSelectOffProduct}
           />
-          <TextInput
-            style={styles.unitInput}
-            value={item.quantityUnit}
-            onChangeText={(v) => setIngredientUnit(index, v)}
-            autoCapitalize="none"
-          />
-          <TouchableOpacity onPress={() => removeIngredient(index)} hitSlop={8}>
-            <Ionicons name="close-circle" size={20} color={colors.textMuted} />
-          </TouchableOpacity>
         </View>
       )}
-      ListEmptyComponent={<Text style={styles.emptyText}>No ingredients added yet</Text>}
-      ListFooterComponent={
-        <View style={styles.footer}>
-          {preview && (
-            <Card style={styles.previewBox}>
-              <Text style={styles.previewTitle}>
-                Per serving: {preview.perServing.calories} kcal · {preview.perServing.proteinG} g protein
-              </Text>
-            </Card>
-          )}
-          {error && <Text style={styles.errorText}>{error}</Text>}
-          <View style={styles.actionsRow}>
+
+      <View style={styles.footer}>
+        {preview && (
+          <Card style={styles.previewBox}>
+            <Text style={styles.previewTitle}>
+              Per serving: {preview.perServing.calories} kcal · {preview.perServing.proteinG} g protein
+            </Text>
+          </Card>
+        )}
+        {error && <Text style={styles.errorText}>{error}</Text>}
+        <View style={styles.actionsRow}>
+          <AppButton
+            title={submitting ? 'Saving…' : submitLabel}
+            onPress={handleSubmit}
+            disabled={submitting}
+            style={styles.actionButton}
+          />
+          {secondaryAction && (
             <AppButton
-              title={submitting ? 'Saving…' : submitLabel}
-              onPress={handleSubmit}
-              disabled={submitting}
+              title={secondaryAction.label}
+              variant="danger"
+              onPress={secondaryAction.onPress}
+              disabled={secondaryAction.disabled}
               style={styles.actionButton}
             />
-            {secondaryAction && (
-              <AppButton
-                title={secondaryAction.label}
-                variant="danger"
-                onPress={secondaryAction.onPress}
-                disabled={secondaryAction.disabled}
-                style={styles.actionButton}
-              />
-            )}
-          </View>
+          )}
         </View>
-      }
-    />
+      </View>
+    </KeyboardAwareScrollView>
     <Modal visible={scannerVisible} animationType="slide" onRequestClose={() => setScannerVisible(false)}>
       <View style={styles.scannerModal}>
         <BarcodeScanner onScanned={handleScanIngredient} statusText={scanStatus ?? undefined} />
@@ -455,10 +453,7 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.lg,
     paddingBottom: 48,
-  },
-  headerFields: {
     gap: spacing.md,
-    marginBottom: spacing.sm,
   },
   card: {
     gap: spacing.md,
@@ -538,7 +533,6 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    marginBottom: spacing.sm,
   },
   ingredientName: {
     flex: 1,
