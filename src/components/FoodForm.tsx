@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Button, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { roundNutritionForDisplay } from '../services/nutrition/scaling';
+
 export interface FoodFormValues {
   name: string;
   brand: string;
@@ -105,6 +107,32 @@ export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onS
     onSubmit(parsed);
   }
 
+  function scaleValuesToServing() {
+    const grams = Number(values.servingSizeG);
+    if (!grams || grams <= 0) return;
+    const factor = grams / 100;
+    const num = (s: string) => (s.trim() ? Number(s) : 0);
+    const scaled = roundNutritionForDisplay({
+      calories: num(values.calories) * factor,
+      proteinG: num(values.proteinG) * factor,
+      carbsG: num(values.carbsG) * factor,
+      fatG: num(values.fatG) * factor,
+      fiberG: num(values.fiberG) * factor,
+      sugarG: num(values.sugarG) * factor,
+      sodiumMg: num(values.sodiumMg) * factor,
+    });
+    setValues((prev) => ({
+      ...prev,
+      calories: String(scaled.calories),
+      proteinG: String(scaled.proteinG),
+      carbsG: String(scaled.carbsG),
+      fatG: String(scaled.fatG),
+      fiberG: String(scaled.fiberG),
+      sugarG: String(scaled.sugarG),
+      sodiumMg: String(scaled.sodiumMg),
+    }));
+  }
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {onScanBarcode && <Button title="Scan Barcode" onPress={onScanBarcode} />}
@@ -158,6 +186,17 @@ export function FoodForm({ initialValues, submitLabel, submitting, onSubmit, onS
       <Field label="Fiber (g)" value={values.fiberG} onChangeText={(v) => set('fiberG', v)} keyboardType="decimal-pad" />
       <Field label="Sugar (g)" value={values.sugarG} onChangeText={(v) => set('sugarG', v)} keyboardType="decimal-pad" />
       <Field label="Sodium (mg)" value={values.sodiumMg} onChangeText={(v) => set('sodiumMg', v)} keyboardType="decimal-pad" />
+
+      {values.basisType === 'per_serving' && (
+        <View style={styles.scaleHelper}>
+          <Button title="Scale values above from per-100g to this serving" onPress={scaleValuesToServing} />
+          <Text style={styles.helperCaption}>
+            If the numbers above are currently per 100g, this multiplies them by the serving size to fill in
+            per-serving values instead.
+          </Text>
+        </View>
+      )}
+
       <Field label="Notes" value={values.notes} onChangeText={(v) => set('notes', v)} multiline />
 
       {error && <Text style={styles.errorText}>{error}</Text>}
@@ -255,5 +294,12 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#c00',
     fontSize: 13,
+  },
+  scaleHelper: {
+    gap: 4,
+  },
+  helperCaption: {
+    fontSize: 12,
+    color: '#888',
   },
 });
