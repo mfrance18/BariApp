@@ -12,7 +12,7 @@ import type { OffProduct } from '../services/openFoodFacts/types';
 import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
 import { computeRecipeTotals, roundNutritionForDisplay } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
-import { isWeighableUnit } from '../utils/servingUnits';
+import { isWeighableUnit, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Card } from './ui/Card';
@@ -85,6 +85,10 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [error, setError] = useState<string | null>(null);
   const [scannerVisible, setScannerVisible] = useState(false);
   const [scanStatus, setScanStatus] = useState<string | null>(null);
+  const [pendingIngredient, setPendingIngredient] = useState<Food | null>(null);
+  const [quantityAmount, setQuantityAmount] = useState('');
+  const [quantityUnit, setQuantityUnit] = useState('');
+  const [quantityError, setQuantityError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
 
   const { data: searchResults } = useQuery({
@@ -103,7 +107,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       .filter((i) => i.quantityG > 0);
     if (validIngredients.length === 0) return null;
     try {
-      const { totals, totalWeightG } = computeRecipeTotals(validIngredients);
+      const { totals } = computeRecipeTotals(validIngredients);
       const perServing = roundNutritionForDisplay({
         calories: totals.calories / servingsNum,
         proteinG: totals.proteinG / servingsNum,
@@ -113,23 +117,54 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         sugarG: totals.sugarG / servingsNum,
         sodiumMg: totals.sodiumMg / servingsNum,
       });
-      return { totalWeightG, perServing };
+      return { perServing };
     } catch {
       return null;
     }
   }, [ingredients, servings]);
 
-  /** Returns an error message if the food couldn't be added (not a weighable unit), or null on success. */
-  function addIngredient(food: Food): string | null {
+  /**
+   * Opens the quantity-entry popup for the food, prefilled from its own
+   * serving size. Returns an error message if the food can't be used at all
+   * (no weighable serving unit and no captured weight equivalent), or null
+   * once the popup is open.
+   */
+  function requestAddIngredient(food: Food): string | null {
     if (!isWeighableUnit(food.servingUnit) && food.servingWeightG == null) {
       const message = `${food.name} is logged as "${food.servingAmount} ${food.servingUnit}", not a weight, so it can't be used in a recipe.`;
       setError(message);
       return message;
     }
     setError(null);
-    setIngredients((prev) => [...prev, { food, quantityG: '100' }]);
-    setSearchText('');
+    setQuantityError(null);
+    if (isWeighableUnit(food.servingUnit)) {
+      setQuantityAmount(String(food.servingAmount));
+      setQuantityUnit(food.servingUnit);
+    } else {
+      setQuantityAmount(food.servingWeightG != null ? String(food.servingWeightG) : '');
+      setQuantityUnit('g');
+    }
+    setPendingIngredient(food);
     return null;
+  }
+
+  function confirmAddIngredient() {
+    if (!pendingIngredient) return;
+    const amount = Number(quantityAmount);
+    if (!amount || amount <= 0) {
+      setQuantityError('Enter an amount greater than 0');
+      return;
+    }
+    const unit = quantityUnit.trim() || 'g';
+    const grams = servingToGrams(amount, unit);
+    if (grams == null) {
+      setQuantityError(`"${unit}" isn't a recognized weight unit (try g, oz, lb, kg, ml)`);
+      return;
+    }
+    setIngredients((prev) => [...prev, { food: pendingIngredient, quantityG: String(grams) }]);
+    setSearchText('');
+    setPendingIngredient(null);
+    setQuantityError(null);
   }
 
   async function handleSelectOffProduct(product: OffProduct) {
@@ -139,11 +174,11 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         if (existing.archivedAt) {
           await restoreFood(existing.id);
         }
-        addIngredient({ ...existing, archivedAt: null });
+        requestAddIngredient({ ...existing, archivedAt: null });
         return;
       }
       const created = await createFood(mapOffProductToFood(product, product.code));
-      addIngredient(created);
+      requestAddIngredient(created);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -166,8 +201,13 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         }
         food = await createFood(mapOffProductToFood(product, barcode));
       }
-      const errorMessage = addIngredient(food);
-      setScanStatus(errorMessage ?? `Added "${food.name}".`);
+      const errorMessage = requestAddIngredient(food);
+      if (errorMessage) {
+        setScanStatus(errorMessage);
+      } else {
+        setScanStatus(null);
+        setScannerVisible(false);
+      }
     } catch (err) {
       setScanStatus((err as Error).message);
     }
@@ -232,7 +272,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
           {searchResults && searchResults.length > 0 && (
             <Card style={styles.searchResults}>
               {searchResults.map((food) => (
-                <TouchableOpacity key={food.id} style={styles.searchResultRow} onPress={() => addIngredient(food)}>
+                <TouchableOpacity key={food.id} style={styles.searchResultRow} onPress={() => requestAddIngredient(food)}>
                   <Text style={styles.searchResultText}>{food.name}</Text>
                   <Ionicons name="add-circle" size={20} color={colors.primary} />
                 </TouchableOpacity>
@@ -275,8 +315,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         <View style={styles.footer}>
           {preview && (
             <Card style={styles.previewBox}>
-              <Text style={styles.previewTitle}>Batch weight: {preview.totalWeightG.toFixed(0)} g</Text>
-              <Text style={styles.previewText}>
+              <Text style={styles.previewTitle}>
                 Per serving: {preview.perServing.calories} kcal · {preview.perServing.proteinG} g protein
               </Text>
             </Card>
@@ -308,6 +347,53 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
         <View style={[styles.scannerCloseRow, { paddingBottom: 16 + insets.bottom }]}>
           <AppButton title="Done" onPress={() => setScannerVisible(false)} />
         </View>
+      </View>
+    </Modal>
+    <Modal
+      visible={!!pendingIngredient}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setPendingIngredient(null)}
+    >
+      <View style={styles.quantityModalOverlay}>
+        <Card style={styles.quantityModalCard}>
+          <Text style={styles.quantityModalTitle}>Add {pendingIngredient?.name}</Text>
+          <View style={styles.servingSizeRow}>
+            <View style={styles.servingAmountField}>
+              <Text style={styles.fieldLabel}>Amount</Text>
+              <TextInput
+                style={styles.input}
+                value={quantityAmount}
+                onChangeText={setQuantityAmount}
+                keyboardType="decimal-pad"
+                placeholder="12"
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+              />
+            </View>
+            <View style={styles.servingUnitField}>
+              <Text style={styles.fieldLabel}>Unit</Text>
+              <TextInput
+                style={styles.input}
+                value={quantityUnit}
+                onChangeText={setQuantityUnit}
+                placeholder="g, oz, ml, lb…"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+          {quantityError && <Text style={styles.errorText}>{quantityError}</Text>}
+          <View style={styles.actionsRow}>
+            <AppButton
+              title="Cancel"
+              variant="secondary"
+              onPress={() => setPendingIngredient(null)}
+              style={styles.actionButton}
+            />
+            <AppButton title="Add to Recipe" onPress={confirmAddIngredient} style={styles.actionButton} />
+          </View>
+        </Card>
       </View>
     </Modal>
     </>
@@ -468,9 +554,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
-  previewText: {
-    color: colors.textSecondary,
-  },
   errorText: {
     color: colors.danger,
     fontSize: 13,
@@ -481,5 +564,34 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
+  },
+  servingSizeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  servingAmountField: {
+    flex: 1,
+    gap: spacing.xs,
+  },
+  servingUnitField: {
+    flex: 2,
+    gap: spacing.xs,
+  },
+  quantityModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: spacing.lg,
+  },
+  quantityModalCard: {
+    width: '100%',
+    maxWidth: 420,
+    gap: spacing.md,
+  },
+  quantityModalTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
   },
 });
