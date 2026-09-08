@@ -15,10 +15,11 @@ export function useOffFoodSearch(query: string, enabled: boolean) {
     getNextPageParam: (lastPage, allPages) => (lastPage.hasMore ? allPages.length + 1 : undefined),
     enabled: active,
     // OFF's free search endpoint has short-lived blips (503s) that a retry
-    // reliably clears — retry a few times automatically before surfacing
-    // an error the user has to act on.
-    retry: 3,
-    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 4000),
+    // reliably clears. Keep retrying indefinitely (capped backoff) instead
+    // of giving up after a few tries — the user shouldn't have to notice a
+    // failure and tap Retry themselves for something that self-heals.
+    retry: true,
+    retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 8000),
   });
 
   return {
