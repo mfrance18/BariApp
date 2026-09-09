@@ -522,6 +522,7 @@ const styles = StyleSheet.create({
     width: CAROUSEL_CARD_WIDTH,
   },
   carouselCard: {
+    flex: 1,
     alignItems: 'flex-start',
     gap: 4,
   },
