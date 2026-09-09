@@ -1,21 +1,30 @@
 import { sqliteDb } from '../db/client';
 
-export type AccentName = 'blue' | 'purple' | 'red' | 'green';
+export type AccentColorName = 'blue' | 'purple' | 'red' | 'green' | 'yellow' | 'lightBlue' | 'orange' | 'grey';
+export type BaseThemeName = 'blue' | 'purple' | 'red' | 'green' | 'black';
+
+const ACCENT_NAMES: AccentColorName[] = ['blue', 'purple', 'red', 'green', 'yellow', 'lightBlue', 'orange', 'grey'];
+const BASE_NAMES: BaseThemeName[] = ['blue', 'purple', 'red', 'green', 'black'];
 
 /** Accent color presets — buttons, icons, active states. Independent of the base theme. */
-export const ACCENT_PRESETS: Record<AccentName, { primary: string; primaryDark: string; primaryLight: string }> = {
+export const ACCENT_PRESETS: Record<AccentColorName, { primary: string; primaryDark: string; primaryLight: string }> = {
   blue: { primary: '#3D9BFF', primaryDark: '#1C5FC7', primaryLight: '#1B3A5C' },
   purple: { primary: '#A374FF', primaryDark: '#6B3FD1', primaryLight: '#332457' },
   red: { primary: '#FF6B6B', primaryDark: '#D13F3F', primaryLight: '#4A2323' },
   green: { primary: '#3ED598', primaryDark: '#1FA06D', primaryLight: '#12402F' },
+  yellow: { primary: '#F0C929', primaryDark: '#C7A31A', primaryLight: '#4A3F14' },
+  lightBlue: { primary: '#5AC8FA', primaryDark: '#2E9FD1', primaryLight: '#1B3A4A' },
+  orange: { primary: '#FF9F43', primaryDark: '#D97C1F', primaryLight: '#4A3018' },
+  grey: { primary: '#9AA5B1', primaryDark: '#6B7684', primaryLight: '#2A3038' },
 };
 
 /** Base theme presets — the dark background/card/border tint. Independent of the accent. */
-export const BASE_PRESETS: Record<AccentName, { background: string; card: string; border: string }> = {
+export const BASE_PRESETS: Record<BaseThemeName, { background: string; card: string; border: string }> = {
   blue: { background: '#0A1929', card: '#122840', border: '#22405E' },
   purple: { background: '#170A29', card: '#241240', border: '#3D225E' },
   red: { background: '#290A0A', card: '#401212', border: '#5E2222' },
   green: { background: '#0A2916', card: '#124028', border: '#225E3D' },
+  black: { background: '#000000', card: '#141414', border: '#2A2A2A' },
 };
 
 /**
@@ -31,16 +40,16 @@ export const BASE_PRESETS: Record<AccentName, { background: string; card: string
  * launch after this feature shipped, before migrations have run) or any
  * other read error.
  */
-function readSavedTheme(): { accent: AccentName; base: AccentName } {
-  const isAccentName = (v: unknown): v is AccentName =>
-    v === 'blue' || v === 'purple' || v === 'red' || v === 'green';
+function readSavedTheme(): { accent: AccentColorName; base: BaseThemeName } {
+  const isAccentName = (v: unknown): v is AccentColorName => ACCENT_NAMES.includes(v as AccentColorName);
+  const isBaseName = (v: unknown): v is BaseThemeName => BASE_NAMES.includes(v as BaseThemeName);
   try {
     const row = sqliteDb.getFirstSync<{ theme_accent: string; theme_base: string }>(
       'SELECT theme_accent, theme_base FROM app_settings WHERE id = 1',
     );
     return {
       accent: isAccentName(row?.theme_accent) ? row.theme_accent : 'blue',
-      base: isAccentName(row?.theme_base) ? row.theme_base : 'blue',
+      base: isBaseName(row?.theme_base) ? row.theme_base : 'blue',
     };
   } catch {
     return { accent: 'blue', base: 'blue' };

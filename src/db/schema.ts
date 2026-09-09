@@ -190,10 +190,12 @@ export const appSettings = sqliteTable('app_settings', {
   weightUnit: text('weight_unit', { enum: ['lb', 'kg'] })
     .notNull()
     .default('lb'),
-  themeAccent: text('theme_accent', { enum: ['blue', 'purple', 'red', 'green'] })
+  themeAccent: text('theme_accent', {
+    enum: ['blue', 'purple', 'red', 'green', 'yellow', 'lightBlue', 'orange', 'grey'],
+  })
     .notNull()
     .default('blue'),
-  themeBase: text('theme_base', { enum: ['blue', 'purple', 'red', 'green'] })
+  themeBase: text('theme_base', { enum: ['blue', 'purple', 'red', 'green', 'black'] })
     .notNull()
     .default('blue'),
   ...timestamps,

@@ -7,14 +7,35 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
 import { getSettings, updateSettings } from '../../src/db/repositories/settingsRepo';
-import { ACCENT_PRESETS, BASE_PRESETS, colors, radius, spacing, typography, type AccentName } from '../../src/theme/theme';
+import {
+  ACCENT_PRESETS,
+  BASE_PRESETS,
+  colors,
+  radius,
+  spacing,
+  typography,
+  type AccentColorName,
+  type BaseThemeName,
+} from '../../src/theme/theme';
 import { mlToOz, ozToMl } from '../../src/utils/units';
 
-const ACCENT_LABELS: Record<AccentName, string> = {
+const ACCENT_LABELS: Record<AccentColorName, string> = {
   blue: 'Blue',
   purple: 'Purple',
   red: 'Red',
   green: 'Green',
+  yellow: 'Yellow',
+  lightBlue: 'Light Blue',
+  orange: 'Orange',
+  grey: 'Grey',
+};
+
+const BASE_LABELS: Record<BaseThemeName, string> = {
+  blue: 'Blue',
+  purple: 'Purple',
+  red: 'Red',
+  green: 'Green',
+  black: 'Black',
 };
 
 export default function SettingsScreen() {
@@ -52,7 +73,13 @@ export default function SettingsScreen() {
   // from SQLite), not per-render, so a plain re-render can't pick up a new
   // theme/accent — reloading the whole JS bundle is what actually applies it.
   const themeMutation = useMutation({
-    mutationFn: async ({ field, value }: { field: 'themeAccent' | 'themeBase'; value: AccentName }) => {
+    mutationFn: async ({
+      field,
+      value,
+    }: {
+      field: 'themeAccent' | 'themeBase';
+      value: AccentColorName | BaseThemeName;
+    }) => {
       await updateSettings({ [field]: value });
       const Updates = await import('expo-updates');
       if (!Updates.isEnabled) {
@@ -110,6 +137,8 @@ export default function SettingsScreen() {
       </Section>
       <Section title="Theme">
         <SwatchPicker
+          names={Object.keys(BASE_LABELS) as BaseThemeName[]}
+          labels={BASE_LABELS}
           selected={settings.themeBase}
           getColor={(name) => BASE_PRESETS[name].card}
           onSelect={(value) => themeMutation.mutate({ field: 'themeBase', value })}
@@ -118,6 +147,8 @@ export default function SettingsScreen() {
       </Section>
       <Section title="Accent">
         <SwatchPicker
+          names={Object.keys(ACCENT_LABELS) as AccentColorName[]}
+          labels={ACCENT_LABELS}
           selected={settings.themeAccent}
           getColor={(name) => ACCENT_PRESETS[name].primary}
           onSelect={(value) => themeMutation.mutate({ field: 'themeAccent', value })}
@@ -138,20 +169,24 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function SwatchPicker({
+function SwatchPicker<T extends string>({
+  names,
+  labels,
   selected,
   getColor,
   onSelect,
   disabled,
 }: {
-  selected: AccentName;
-  getColor: (name: AccentName) => string;
-  onSelect: (value: AccentName) => void;
+  names: T[];
+  labels: Record<T, string>;
+  selected: T;
+  getColor: (name: T) => string;
+  onSelect: (value: T) => void;
   disabled: boolean;
 }) {
   return (
     <View style={styles.swatchRow}>
-      {(Object.keys(ACCENT_LABELS) as AccentName[]).map((name) => {
+      {names.map((name) => {
         const isSelected = selected === name;
         return (
           <TouchableOpacity
@@ -165,7 +200,7 @@ function SwatchPicker({
             >
               {isSelected && <Ionicons name="checkmark" size={18} color="#fff" />}
             </View>
-            <Text style={styles.swatchLabel}>{ACCENT_LABELS[name]}</Text>
+            <Text style={styles.swatchLabel}>{labels[name]}</Text>
           </TouchableOpacity>
         );
       })}
@@ -263,11 +298,14 @@ const styles = StyleSheet.create({
   },
   swatchRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-start',
+    gap: spacing.md,
   },
   swatchButton: {
     alignItems: 'center',
     gap: spacing.xs,
+    width: 64,
   },
   swatchCircle: {
     width: 44,
