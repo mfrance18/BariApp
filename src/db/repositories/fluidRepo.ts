@@ -29,6 +29,13 @@ export async function createEntry(amountMl: number, sourceLabel?: string): Promi
   return rows[0];
 }
 
+export async function updateEntry(
+  id: number,
+  patch: Partial<Pick<FluidLogEntry, 'amountMl' | 'loggedAt' | 'sourceLabel'>>,
+): Promise<void> {
+  await db.update(fluidLog).set(patch).where(eq(fluidLog.id, id));
+}
+
 export async function deleteEntry(id: number): Promise<void> {
   await db.delete(fluidLog).where(eq(fluidLog.id, id));
 }
