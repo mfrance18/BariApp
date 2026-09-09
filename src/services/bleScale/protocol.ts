@@ -22,6 +22,8 @@
  * mattered.
  */
 
+import { OZ_TO_G } from '../../utils/units';
+
 export const ESN00_SERVICE_UUID = '00001910-0000-1000-8000-00805f9b34fb';
 export const ESN00_NOTIFY_CHARACTERISTIC_UUID = '00002c12-0000-1000-8000-00805f9b34fb';
 
@@ -40,8 +42,6 @@ export const Esn00Unit = {
   FL_OZ_MILK: 0x05,
   OZ: 0x06,
 } as const;
-
-const OZ_TO_G = 28.349523125;
 
 export interface Esn00Frame {
   type: number;

@@ -1,8 +1,11 @@
-import { OZ_TO_ML } from './units';
+import { OZ_TO_G } from './units';
 
 /**
  * Grams represented by one of each recognized weight/volume unit. Volume
  * units (ml) assume water-equivalent density, same as the rest of the app.
+ * "oz" here is the mass ounce (28.3495 g) used for weighing food — distinct
+ * from the fluid ounce (OZ_TO_ML, ~29.5735) used for fluid intake tracking;
+ * don't conflate the two despite the shared name.
  * Any unit not listed here (e.g. "bottle", "scoop", "slice") is treated as
  * a discrete, non-weighable count — logging asks "how many?" instead of
  * "how much do you weigh?".
@@ -14,9 +17,9 @@ const GRAMS_PER_UNIT: Record<string, number> = {
   kg: 1000,
   kilogram: 1000,
   kilograms: 1000,
-  oz: OZ_TO_ML,
-  ounce: OZ_TO_ML,
-  ounces: OZ_TO_ML,
+  oz: OZ_TO_G,
+  ounce: OZ_TO_G,
+  ounces: OZ_TO_G,
   lb: 453.592,
   lbs: 453.592,
   pound: 453.592,

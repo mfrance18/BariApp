@@ -8,8 +8,8 @@ describe('gramsPerUnit', () => {
     expect(gramsPerUnit('lb')).toBeCloseTo(453.592);
   });
 
-  it('resolves oz using the same fl-oz factor used elsewhere in the app', () => {
-    expect(gramsPerUnit('oz')).toBeCloseTo(29.5735);
+  it('resolves oz using the mass ounce, not the fluid ounce used for fluid intake', () => {
+    expect(gramsPerUnit('oz')).toBeCloseTo(28.349523125);
   });
 
   it('returns null for a non-weight unit', () => {

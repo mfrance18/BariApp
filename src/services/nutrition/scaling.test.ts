@@ -42,7 +42,7 @@ describe('getReferenceWeightG', () => {
   });
 
   it('converts a non-gram weight unit to grams', () => {
-    expect(getReferenceWeightG({ servingAmount: 1, servingUnit: 'oz' })).toBeCloseTo(29.5735);
+    expect(getReferenceWeightG({ servingAmount: 1, servingUnit: 'oz' })).toBeCloseTo(28.349523125);
   });
 
   it('throws for a discrete, non-weighable unit', () => {
