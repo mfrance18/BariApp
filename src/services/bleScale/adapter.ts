@@ -42,26 +42,21 @@ export async function unpairScale(): Promise<void> {
   }
 }
 
-export type ScaleWeightResult =
-  | { ok: true; weightG: number; frames: string[] }
-  | { ok: false; error: string; frames: string[] };
-
-export async function readWeightFromScale(): Promise<ScaleWeightResult> {
+export async function readWeightFromScale(): Promise<{ ok: true; weightG: number } | { ok: false; error: string }> {
   try {
     const paired = await getPairedScale();
     if (!paired) {
-      return { ok: false, error: 'No food scale paired. Pair one in Settings first.', frames: [] };
+      return { ok: false, error: 'No food scale paired. Pair one in Settings first.' };
     }
-    const { grams, frames } = await readWeightGrams(paired.deviceId, READ_TIMEOUT_MS);
+    const grams = await readWeightGrams(paired.deviceId, READ_TIMEOUT_MS);
     if (grams == null) {
       return {
         ok: false,
         error: 'Could not get a reading from the scale. Make sure it is on, in range, and set to grams or oz.',
-        frames,
       };
     }
-    return { ok: true, weightG: grams, frames };
+    return { ok: true, weightG: grams };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'Failed to read weight from scale', frames: [] };
+    return { ok: false, error: error instanceof Error ? error.message : 'Failed to read weight from scale' };
   }
 }

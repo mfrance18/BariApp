@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../../src/components/ui/AppButton';
@@ -57,7 +57,6 @@ export default function WeighScreen() {
   const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale' | 'ble_scale'>('manual');
   const [scaleError, setScaleError] = useState<string | null>(null);
-  const [scaleDebugFrames, setScaleDebugFrames] = useState<string[]>([]);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
@@ -149,7 +148,6 @@ export default function WeighScreen() {
   const pullFromScaleMutation = useMutation({
     mutationFn: readWeightFromScale,
     onSuccess: (result) => {
-      setScaleDebugFrames(result.frames);
       if (!result.ok) {
         setScaleError(result.error);
         return;
@@ -278,7 +276,6 @@ export default function WeighScreen() {
               variant="secondary"
               onPress={() => {
                 setScaleError(null);
-                setScaleDebugFrames([]);
                 pullFromScaleMutation.mutate();
               }}
               disabled={pullFromScaleMutation.isPending}
@@ -287,16 +284,6 @@ export default function WeighScreen() {
           {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
           {weightSource === 'ble_scale' && <Text style={styles.helperText}>Weight pulled from food scale</Text>}
           {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
-          {scaleDebugFrames.length > 0 && (
-            <View style={styles.debugBox}>
-              <Text style={styles.debugHeading}>Scale debug (temporary)</Text>
-              {scaleDebugFrames.map((frame, index) => (
-                <Text key={index} style={styles.debugText} selectable>
-                  {frame}
-                </Text>
-              ))}
-            </View>
-          )}
         </Card>
       )}
 
@@ -423,22 +410,5 @@ const styles = StyleSheet.create({
   helperText: {
     color: colors.primary,
     fontSize: 13,
-  },
-  debugBox: {
-    gap: 2,
-    padding: spacing.sm,
-    borderRadius: radius.sm,
-    backgroundColor: colors.background,
-  },
-  debugHeading: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  debugText: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontFamily: Platform.OS === 'android' ? 'monospace' : 'Menlo',
   },
 });
