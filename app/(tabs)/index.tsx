@@ -178,21 +178,19 @@ export default function DashboardScreen() {
             </View>
 
             <TouchableOpacity style={styles.carouselPage} onPress={() => router.push('/fluids')} activeOpacity={0.8}>
-              <Card style={styles.carouselCard}>
-                <View style={styles.ringCardRow}>
-                  <ProgressRing size={148} strokeWidth={14} progress={fluidProgress} color={colors.fluid} trackColor={colors.border}>
-                    <Text style={styles.ringValue}>{Math.round(mlToOz(fluidTotalMl))}</Text>
-                    <Text style={styles.ringLabel}>oz today</Text>
-                  </ProgressRing>
+              <Card style={[styles.carouselCard, styles.fluidCard]}>
+                <ProgressRing size={148} strokeWidth={14} progress={fluidProgress} color={colors.fluid} trackColor={colors.border}>
+                  <Text style={styles.ringValue}>{Math.round(mlToOz(fluidTotalMl))}</Text>
+                  <Text style={styles.ringLabel}>oz today</Text>
+                </ProgressRing>
 
-                  <View style={styles.ringStatsColumn}>
-                    <RingStat label="Goal" value={Math.round(mlToOz(fluidGoalMl))} />
-                    <RingStat label="Logged" value={Math.round(mlToOz(fluidTotalMl))} />
-                    <RingStat
-                      label="Remaining"
-                      value={Math.max(0, Math.round(mlToOz(fluidGoalMl) - mlToOz(fluidTotalMl)))}
-                    />
-                  </View>
+                <View style={styles.fluidStatsRow}>
+                  <FluidStat label="Goal" value={Math.round(mlToOz(fluidGoalMl))} />
+                  <FluidStat label="Logged" value={Math.round(mlToOz(fluidTotalMl))} />
+                  <FluidStat
+                    label="Remaining"
+                    value={Math.max(0, Math.round(mlToOz(fluidGoalMl) - mlToOz(fluidTotalMl)))}
+                  />
                 </View>
               </Card>
             </TouchableOpacity>
@@ -284,6 +282,15 @@ function RingStat({ label, value, highlight }: { label: string; value: number; h
     <View style={styles.ringStatRow}>
       <Text style={styles.ringStatLabel}>{label}</Text>
       <Text style={[styles.ringStatValue, highlight && styles.ringValueDanger]}>{value}</Text>
+    </View>
+  );
+}
+
+function FluidStat({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.fluidStat}>
+      <Text style={styles.fluidStatValue}>{value}</Text>
+      <Text style={styles.fluidStatLabel}>{label}</Text>
     </View>
   );
 }
@@ -525,6 +532,28 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'flex-start',
     gap: 4,
+  },
+  fluidCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fluidStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignSelf: 'stretch',
+    marginTop: spacing.md,
+  },
+  fluidStat: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  fluidStatValue: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  fluidStatLabel: {
+    ...typography.caption,
   },
   dotsRow: {
     flexDirection: 'row',
