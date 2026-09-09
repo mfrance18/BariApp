@@ -10,6 +10,7 @@ import m0005 from './0005_foods_hard_delete.sql';
 import m0006 from './0006_vitamins_meds_barcode.sql';
 import m0007 from './0007_theme_accent.sql';
 import m0008 from './0008_theme_base.sql';
+import m0009 from './0009_ble_scale_pairing.sql';
 
   export default {
     journal,
@@ -22,6 +23,7 @@ m0004,
 m0005,
 m0006,
 m0007,
-m0008
+m0008,
+m0009
     }
   }

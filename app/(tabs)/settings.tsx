@@ -7,6 +7,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
 import { getSettings, updateSettings } from '../../src/db/repositories/settingsRepo';
+import { getPairedScale, pairScale, unpairScale } from '../../src/services/bleScale/adapter';
 import {
   ACCENT_PRESETS,
   BASE_PRESETS,
@@ -96,6 +97,24 @@ export default function SettingsScreen() {
     },
   });
 
+  const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
+
+  const pairScaleMutation = useMutation({
+    mutationFn: pairScale,
+    onSuccess: (result) => {
+      if (result.ok) {
+        queryClient.invalidateQueries({ queryKey: ['pairedScale'] });
+      } else {
+        Alert.alert('Could not pair scale', result.error);
+      }
+    },
+  });
+
+  const unpairScaleMutation = useMutation({
+    mutationFn: unpairScale,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairedScale'] }),
+  });
+
   const goalsValid =
     Number(caloriesInput) > 0 && Number(proteinInput) > 0 && Number(fluidOzInput) > 0;
   const goalsDirty =
@@ -133,6 +152,25 @@ export default function SettingsScreen() {
         {!goalsValid && <Text style={styles.errorText}>Goals must be greater than 0.</Text>}
         {saveGoalsMutation.isSuccess && !goalsDirty && (
           <Text style={styles.helperText}>Goals saved.</Text>
+        )}
+      </Section>
+      <Section title="Food Scale">
+        <Text style={styles.rowText}>
+          {pairedScaleQuery.data ? `Paired: ${pairedScaleQuery.data.name ?? 'ESN00 Scale'}` : 'No scale paired'}
+        </Text>
+        <AppButton
+          title={pairScaleMutation.isPending ? 'Scanning…' : pairedScaleQuery.data ? 'Re-scan for Scale' : 'Scan for Scale'}
+          variant="secondary"
+          onPress={() => pairScaleMutation.mutate()}
+          disabled={pairScaleMutation.isPending}
+        />
+        {pairedScaleQuery.data && (
+          <AppButton
+            title="Forget Scale"
+            variant="text"
+            onPress={() => unpairScaleMutation.mutate()}
+            disabled={unpairScaleMutation.isPending}
+          />
         )}
       </Section>
       <Section title="Theme">

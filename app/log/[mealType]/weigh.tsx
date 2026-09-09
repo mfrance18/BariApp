@@ -10,6 +10,7 @@ import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
+import { getPairedScale, readWeightFromScale } from '../../../src/services/bleScale/adapter';
 import {
   computeRecipeTotals,
   getReferenceWeightG,
@@ -54,7 +55,8 @@ export default function WeighScreen() {
   const [weightInput, setWeightInput] = useState('');
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('oz');
   const [servingsInput, setServingsInput] = useState('1');
-  const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
+  const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale' | 'ble_scale'>('manual');
+  const [scaleError, setScaleError] = useState<string | null>(null);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
@@ -140,6 +142,22 @@ export default function WeighScreen() {
     }
     return null;
   }, [measuredAmount, isCountBased, itemType, foodQuery.data, recipeQuery.data]);
+
+  const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
+
+  const pullFromScaleMutation = useMutation({
+    mutationFn: readWeightFromScale,
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setScaleError(result.error);
+        return;
+      }
+      setScaleError(null);
+      const displayAmount = gramsToServing(result.weightG, weightUnit) ?? result.weightG;
+      setWeightInput(String(Math.round(displayAmount * 100) / 100));
+      setWeightSource('ble_scale');
+    },
+  });
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -252,6 +270,19 @@ export default function WeighScreen() {
               />
             </View>
           </View>
+          {pairedScaleQuery.data && (
+            <AppButton
+              title={pullFromScaleMutation.isPending ? 'Reading…' : 'Pull from Scale'}
+              variant="secondary"
+              onPress={() => {
+                setScaleError(null);
+                pullFromScaleMutation.mutate();
+              }}
+              disabled={pullFromScaleMutation.isPending}
+            />
+          )}
+          {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
+          {weightSource === 'ble_scale' && <Text style={styles.helperText}>Weight pulled from food scale</Text>}
           {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
         </Card>
       )}

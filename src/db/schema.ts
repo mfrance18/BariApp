@@ -85,7 +85,7 @@ export const mealLogEntries = sqliteTable(
     weightG: real('weight_g'),
     quantityAmount: real('quantity_amount'),
     quantityUnit: text('quantity_unit'),
-    weightSource: text('weight_source', { enum: ['vesync_scale', 'manual'] }).notNull(),
+    weightSource: text('weight_source', { enum: ['vesync_scale', 'manual', 'ble_scale'] }).notNull(),
     calories: real('calories').notNull(),
     proteinG: real('protein_g').notNull(),
     carbsG: real('carbs_g').notNull(),
@@ -198,5 +198,7 @@ export const appSettings = sqliteTable('app_settings', {
   themeBase: text('theme_base', { enum: ['blue', 'purple', 'red', 'green', 'black'] })
     .notNull()
     .default('blue'),
+  bleScaleDeviceId: text('ble_scale_device_id'),
+  bleScaleDeviceName: text('ble_scale_device_name'),
   ...timestamps,
 });

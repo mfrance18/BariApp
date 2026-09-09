@@ -47,6 +47,14 @@
         {
           "useSQLCipher": false
         }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "neverForLocation": true,
+          "bluetoothAlwaysPermission": "BariApp uses Bluetooth to connect to your food scale for weight readings."
+        }
       ]
     ],
     "experiments": {

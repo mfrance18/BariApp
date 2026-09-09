@@ -64,6 +64,13 @@
       "when": 1788910000000,
       "tag": "0008_theme_base",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1788920000000,
+      "tag": "0009_ble_scale_pairing",
+      "breakpoints": true
     }
   ]
 }
