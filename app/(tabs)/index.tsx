@@ -203,11 +203,13 @@ export default function DashboardScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.carouselPage} onPress={() => router.push('/weight-history')} activeOpacity={0.8}>
-              <Card style={styles.carouselCard}>
-                <Ionicons name="trending-down" size={20} color={colors.weight} />
+              <Card style={[styles.carouselCard, styles.weightCard]}>
+                <View style={styles.weightIconCircle}>
+                  <Ionicons name="trending-down" size={28} color={colors.weight} />
+                </View>
                 {latestWeight ? (
                   <>
-                    <Text style={styles.statCardValue}>
+                    <Text style={styles.ringValue}>
                       {(settings?.weightUnit === 'kg' ? latestWeight.weightKg : latestWeight.weightKg * KG_TO_LB).toFixed(
                         1,
                       )}{' '}
@@ -554,6 +556,20 @@ const styles = StyleSheet.create({
   },
   fluidCard: {
     alignItems: 'center',
+  },
+  weightCard: {
+    alignItems: 'center',
+  },
+  weightIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    marginBottom: spacing.sm,
   },
   statChipsRow: {
     flexDirection: 'row',
