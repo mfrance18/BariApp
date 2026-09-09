@@ -1,7 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import {
+  Dimensions,
+  FlatList,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+} from 'react-native';
 
 import { Card } from '../../src/components/ui/Card';
 import { ProgressRing } from '../../src/components/ui/ProgressRing';
@@ -24,6 +35,10 @@ function formatWeightOz(weightG: number): string {
 }
 
 const KG_TO_LB = 2.20462;
+
+// The app is portrait-locked, so a static width computed once is fine.
+const CAROUSEL_CARD_WIDTH = Dimensions.get('window').width - spacing.lg * 2;
+const DASHBOARD_CARD_COUNT = 3;
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -48,6 +63,12 @@ function addDays(dateKey: string, days: number): string {
 export default function DashboardScreen() {
   const { logDate, setLogDate } = useSelectedLogDate();
   const queryClient = useQueryClient();
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+
+  function handleCarouselMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const index = Math.round(event.nativeEvent.contentOffset.x / CAROUSEL_CARD_WIDTH);
+    setActiveCardIndex(Math.max(0, Math.min(DASHBOARD_CARD_COUNT - 1, index)));
+  }
 
   const { data: entries } = useQuery({
     queryKey: ['mealLogEntries', logDate],
@@ -108,47 +129,56 @@ export default function DashboardScreen() {
             </TouchableOpacity>
           </View>
 
-          <Card style={styles.calorieCard}>
-            <ProgressRing
-              size={148}
-              strokeWidth={14}
-              progress={ringProgress}
-              color={overGoal ? colors.danger : colors.primary}
-              trackColor={colors.border}
-            >
-              <Text style={[styles.ringValue, overGoal && styles.ringValueDanger]}>
-                {Math.abs(caloriesRemaining)}
-              </Text>
-              <Text style={styles.ringLabel}>{overGoal ? 'kcal over' : 'kcal left'}</Text>
-            </ProgressRing>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleCarouselMomentumEnd}
+          >
+            <View style={styles.carouselPage}>
+              <Card style={styles.carouselCard}>
+                <View style={styles.calorieCard}>
+                  <ProgressRing
+                    size={148}
+                    strokeWidth={14}
+                    progress={ringProgress}
+                    color={overGoal ? colors.danger : colors.primary}
+                    trackColor={colors.border}
+                  >
+                    <Text style={[styles.ringValue, overGoal && styles.ringValueDanger]}>
+                      {Math.abs(caloriesRemaining)}
+                    </Text>
+                    <Text style={styles.ringLabel}>{overGoal ? 'kcal over' : 'kcal left'}</Text>
+                  </ProgressRing>
 
-            <View style={styles.calorieStatsColumn}>
-              <CalorieStat label="Goal" value={Math.round(calorieGoal)} />
-              <CalorieStat label="Food" value={Math.round(dailyTotals.calories)} />
-              <CalorieStat label="Remaining" value={caloriesRemaining} highlight={overGoal} />
+                  <View style={styles.calorieStatsColumn}>
+                    <CalorieStat label="Goal" value={Math.round(calorieGoal)} />
+                    <CalorieStat label="Food" value={Math.round(dailyTotals.calories)} />
+                    <CalorieStat label="Remaining" value={caloriesRemaining} highlight={overGoal} />
+                  </View>
+                </View>
+
+                <View style={styles.macrosSection}>
+                  <MacroBar
+                    label="Protein"
+                    value={dailyTotals.proteinG}
+                    goal={proteinGoal}
+                    progress={proteinProgress}
+                    color={colors.protein}
+                    unit="g"
+                  />
+                  <View style={styles.macroChipsRow}>
+                    <MacroChip label="Carbs" value={dailyTotals.carbsG} unit="g" color={colors.carbs} />
+                    <MacroChip label="Fat" value={dailyTotals.fatG} unit="g" color={colors.fat} />
+                    <MacroChip label="Fiber" value={dailyTotals.fiberG} unit="g" color={colors.fiber} />
+                    <MacroChip label="Sodium" value={dailyTotals.sodiumMg} unit="mg" color={colors.sodium} />
+                  </View>
+                </View>
+              </Card>
             </View>
-          </Card>
 
-          <Card style={styles.macrosCard}>
-            <MacroBar
-              label="Protein"
-              value={dailyTotals.proteinG}
-              goal={proteinGoal}
-              progress={proteinProgress}
-              color={colors.protein}
-              unit="g"
-            />
-            <View style={styles.macroChipsRow}>
-              <MacroChip label="Carbs" value={dailyTotals.carbsG} unit="g" color={colors.carbs} />
-              <MacroChip label="Fat" value={dailyTotals.fatG} unit="g" color={colors.fat} />
-              <MacroChip label="Fiber" value={dailyTotals.fiberG} unit="g" color={colors.fiber} />
-              <MacroChip label="Sodium" value={dailyTotals.sodiumMg} unit="mg" color={colors.sodium} />
-            </View>
-          </Card>
-
-          <View style={styles.statCardsRow}>
-            <TouchableOpacity style={styles.statCardWrapper} onPress={() => router.push('/fluids')}>
-              <Card style={styles.statCard}>
+            <TouchableOpacity style={styles.carouselPage} onPress={() => router.push('/fluids')} activeOpacity={0.8}>
+              <Card style={styles.carouselCard}>
                 <Ionicons name="water" size={20} color={colors.fluid} />
                 <Text style={styles.statCardValue}>
                   {mlToOz(fluidTotalMl).toFixed(0)} <Text style={styles.statCardUnit}>oz</Text>
@@ -160,8 +190,8 @@ export default function DashboardScreen() {
               </Card>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.statCardWrapper} onPress={() => router.push('/weight-history')}>
-              <Card style={styles.statCard}>
+            <TouchableOpacity style={styles.carouselPage} onPress={() => router.push('/weight-history')} activeOpacity={0.8}>
+              <Card style={styles.carouselCard}>
                 <Ionicons name="trending-down" size={20} color={colors.weight} />
                 {latestWeight ? (
                   <>
@@ -180,6 +210,12 @@ export default function DashboardScreen() {
                 )}
               </Card>
             </TouchableOpacity>
+          </ScrollView>
+
+          <View style={styles.dotsRow}>
+            {Array.from({ length: DASHBOARD_CARD_COUNT }).map((_, index) => (
+              <View key={index} style={[styles.dot, index === activeCardIndex && styles.dotActive]} />
+            ))}
           </View>
 
           <Text style={styles.mealsHeading}>Meals</Text>
@@ -386,6 +422,7 @@ const styles = StyleSheet.create({
   calorieCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'stretch',
     gap: spacing.lg,
   },
   ringValue: {
@@ -419,8 +456,13 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  macrosCard: {
+  macrosSection: {
+    alignSelf: 'stretch',
     gap: spacing.md,
+    marginTop: spacing.lg,
+    paddingTop: spacing.lg,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
   },
   macroBarBlock: {
     gap: spacing.xs,
@@ -469,18 +511,27 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
   },
-  statCardsRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
+  carouselPage: {
+    width: CAROUSEL_CARD_WIDTH,
   },
-  statCardWrapper: {
-    flex: 1,
-  },
-  statCard: {
-    flex: 1,
+  carouselCard: {
     alignItems: 'flex-start',
     gap: 4,
-    padding: spacing.md,
+  },
+  dotsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.border,
+  },
+  dotActive: {
+    backgroundColor: colors.primary,
+    width: 16,
   },
   statCardValue: {
     fontSize: 17,
