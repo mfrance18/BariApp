@@ -1,18 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createFood, getFoodByBarcode, listFoods, updateFood, type Food } from '../db/repositories/foodsRepo';
+import { getPairedScale, readWeightFromScale } from '../services/bleScale/adapter';
 import { getProductByBarcode } from '../services/openFoodFacts/client';
 import { mapOffProductToFood, type OffFoodInput } from '../services/openFoodFacts/mapper';
 import type { OffProduct } from '../services/openFoodFacts/types';
 import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
 import { computeRecipeTotals, getReferenceWeightG, roundNutritionForDisplay, scaleNutrition } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
-import { isWeighableUnit, servingToGrams } from '../utils/servingUnits';
+import { gramsToServing, isWeighableUnit, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Card } from './ui/Card';
@@ -154,10 +155,28 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [nutritionDraft, setNutritionDraft] = useState<NutritionDraft>(EMPTY_NUTRITION_DRAFT);
   const [savingIngredient, setSavingIngredient] = useState(false);
   const [quantityError, setQuantityError] = useState<string | null>(null);
+  const [scaleError, setScaleError] = useState<string | null>(null);
   const [resolvingIngredients, setResolvingIngredients] = useState(false);
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const nextTempIdRef = useRef(-1);
+
+  const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
+
+  const pullFromScaleMutation = useMutation({
+    mutationFn: readWeightFromScale,
+    onSuccess: (result) => {
+      if (!result.ok) {
+        setScaleError(result.error);
+        return;
+      }
+      setScaleError(null);
+      const targetUnit = isWeighableUnit(quantityUnit.trim()) ? quantityUnit.trim() : 'oz';
+      const displayAmount = gramsToServing(result.weightG, targetUnit) ?? result.weightG;
+      setQuantityUnit(targetUnit);
+      setQuantityAmount(String(Math.round(displayAmount * 100) / 100));
+    },
+  });
 
   function setNutritionField<K extends keyof NutritionDraft>(key: K, value: string) {
     setNutritionDraft((prev) => ({ ...prev, [key]: value }));
@@ -209,6 +228,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     }
     setError(null);
     setQuantityError(null);
+    setScaleError(null);
     let defaultAmount: number;
     let defaultUnit: string;
     if (isWeighableUnit(food.servingUnit)) {
@@ -618,6 +638,19 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
                 />
               </View>
             </View>
+
+            {pairedScaleQuery.data && (
+              <AppButton
+                title={pullFromScaleMutation.isPending ? 'Reading…' : 'Pull from Scale'}
+                variant="secondary"
+                onPress={() => {
+                  setScaleError(null);
+                  pullFromScaleMutation.mutate();
+                }}
+                disabled={pullFromScaleMutation.isPending}
+              />
+            )}
+            {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
 
             <Text style={styles.sectionLabel}>
               NUTRITION (FOR {quantityAmount || pendingIngredient?.servingAmount} {quantityUnit || pendingIngredient?.servingUnit})
