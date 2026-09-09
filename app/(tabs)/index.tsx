@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { Card } from '../../src/components/ui/Card';
@@ -12,9 +11,10 @@ import { deleteEntry, listEntriesForDate, type MealLogEntryWithName } from '../.
 import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } from '../../src/db/repositories/medsRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
+import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { formatDisplayDate, formatTimeOfDay, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
+import { formatDisplayDate, formatTimeOfDay, toLogDateKey } from '../../src/utils/date';
 import { mlToOz } from '../../src/utils/units';
 import { gramsToServing } from '../../src/utils/servingUnits';
 
@@ -46,7 +46,7 @@ function addDays(dateKey: string, days: number): string {
 }
 
 export default function DashboardScreen() {
-  const [logDate, setLogDate] = useState(todayLogDateKey());
+  const { logDate, setLogDate } = useSelectedLogDate();
   const queryClient = useQueryClient();
 
   const { data: entries } = useQuery({

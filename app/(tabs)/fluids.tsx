@@ -28,9 +28,19 @@ import {
   type FluidLogEntry,
 } from '../../src/db/repositories/fluidRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
+import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { todayLogDateKey } from '../../src/utils/date';
+import { formatDisplayDate, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz, ozToMl } from '../../src/utils/units';
+
+/** Combines a "YYYY-MM-DD" log date with the current wall-clock time — used
+ * as the default logged-at moment when adding a fluid for a non-today date. */
+function combineDateKeyWithNow(dateKey: string): Date {
+  const now = new Date();
+  const combined = new Date(`${dateKey}T00:00:00`);
+  combined.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+  return combined;
+}
 
 const CUPS_OZ = [4, 8, 12, 16, 20];
 
@@ -42,7 +52,7 @@ type FluidModalState = { mode: 'add'; amountOz: number | null } | { mode: 'edit'
 
 export default function FluidsScreen() {
   const queryClient = useQueryClient();
-  const logDate = todayLogDateKey();
+  const { logDate } = useSelectedLogDate();
   const [modalState, setModalState] = useState<FluidModalState | null>(null);
 
   const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
@@ -52,8 +62,8 @@ export default function FluidsScreen() {
   });
 
   const addMutation = useMutation({
-    mutationFn: ({ amountOz, label }: { amountOz: number; label: string }) =>
-      createEntry(ozToMl(amountOz), label || undefined),
+    mutationFn: ({ amountOz, label, loggedAt }: { amountOz: number; label: string; loggedAt: Date }) =>
+      createEntry({ amountMl: ozToMl(amountOz), loggedAt, logDate, sourceLabel: label || undefined }),
     onSuccess: () => {
       setModalState(null);
       queryClient.invalidateQueries({ queryKey: ['fluidLog', logDate] });
@@ -93,7 +103,9 @@ export default function FluidsScreen() {
       keyExtractor={(item) => String(item.id)}
       ListHeaderComponent={
         <View style={styles.header}>
-          <Text style={styles.heading}>Today&apos;s Fluids</Text>
+          <Text style={styles.heading}>
+            {logDate === todayLogDateKey() ? "Today's Fluids" : `${formatDisplayDate(logDate)} Fluids`}
+          </Text>
 
           <Card style={styles.progressCard}>
             <View style={styles.progressHeaderRow}>
@@ -127,7 +139,9 @@ export default function FluidsScreen() {
             onPress={() => setModalState({ mode: 'add', amountOz: null })}
           />
 
-          {(entries ?? []).length > 0 && <Text style={styles.sectionLabel}>TODAY</Text>}
+          {(entries ?? []).length > 0 && (
+            <Text style={styles.sectionLabel}>{logDate === todayLogDateKey() ? 'TODAY' : formatDisplayDate(logDate).toUpperCase()}</Text>
+          )}
         </View>
       }
       renderItem={({ item }) => (
@@ -137,11 +151,16 @@ export default function FluidsScreen() {
           onDelete={() => deleteMutation.mutate(item.id)}
         />
       )}
-      ListEmptyComponent={<Text style={styles.emptyText}>Nothing logged yet today</Text>}
+      ListEmptyComponent={
+        <Text style={styles.emptyText}>
+          Nothing logged {logDate === todayLogDateKey() ? 'yet today' : 'for this day'}
+        </Text>
+      }
     />
     {modalState && (
       <FluidModal
         state={modalState}
+        logDate={logDate}
         onClose={() => setModalState(null)}
         onAdd={(data) => addMutation.mutate(data)}
         onUpdate={(id, patch) => updateMutation.mutate({ id, ...patch })}
@@ -181,6 +200,7 @@ function FluidRow({
 
 function FluidModal({
   state,
+  logDate,
   onClose,
   onAdd,
   onUpdate,
@@ -188,8 +208,9 @@ function FluidModal({
   saving,
 }: {
   state: FluidModalState;
+  logDate: string;
   onClose: () => void;
-  onAdd: (data: { amountOz: number; label: string }) => void;
+  onAdd: (data: { amountOz: number; label: string; loggedAt: Date }) => void;
   onUpdate: (id: number, patch: { amountMl: number; loggedAt: string; sourceLabel: string | null }) => void;
   onDelete: (id: number) => void;
   saving: boolean;
@@ -199,7 +220,9 @@ function FluidModal({
     isEdit ? formatOz(mlToOz(state.entry.amountMl)) : state.amountOz != null ? formatOz(state.amountOz) : '',
   );
   const [label, setLabel] = useState(isEdit ? (state.entry.sourceLabel ?? '') : '');
-  const [loggedAt, setLoggedAt] = useState(isEdit ? new Date(state.entry.loggedAt) : new Date());
+  const [loggedAt, setLoggedAt] = useState(
+    isEdit ? new Date(state.entry.loggedAt) : combineDateKeyWithNow(logDate),
+  );
   const [showPicker, setShowPicker] = useState(Platform.OS === 'ios');
 
   function handleTimeChange(event: DateTimePickerEvent, date?: Date) {
@@ -214,7 +237,7 @@ function FluidModal({
     if (isEdit) {
       onUpdate(state.entry.id, { amountMl: ozToMl(amountOz), loggedAt: loggedAt.toISOString(), sourceLabel: label.trim() || null });
     } else {
-      onAdd({ amountOz, label: label.trim() });
+      onAdd({ amountOz, label: label.trim(), loggedAt });
     }
   }
 

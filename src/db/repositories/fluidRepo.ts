@@ -2,7 +2,6 @@ import { desc, eq } from 'drizzle-orm';
 
 import { db } from '../client';
 import { fluidLog } from '../schema';
-import { toLogDateKey } from '../../utils/date';
 
 export type FluidLogEntry = typeof fluidLog.$inferSelect;
 
@@ -14,16 +13,20 @@ export async function listEntriesForDate(logDate: string): Promise<FluidLogEntry
     .orderBy(desc(fluidLog.loggedAt));
 }
 
-export async function createEntry(amountMl: number, sourceLabel?: string): Promise<FluidLogEntry> {
-  const now = new Date();
+export async function createEntry(input: {
+  amountMl: number;
+  loggedAt: Date;
+  logDate: string;
+  sourceLabel?: string | null;
+}): Promise<FluidLogEntry> {
   const rows = await db
     .insert(fluidLog)
     .values({
-      amountMl,
-      loggedAt: now.toISOString(),
-      logDate: toLogDateKey(now),
-      sourceLabel: sourceLabel ?? null,
-      createdAt: now.toISOString(),
+      amountMl: input.amountMl,
+      loggedAt: input.loggedAt.toISOString(),
+      logDate: input.logDate,
+      sourceLabel: input.sourceLabel ?? null,
+      createdAt: new Date().toISOString(),
     })
     .returning();
   return rows[0];
