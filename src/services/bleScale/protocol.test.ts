@@ -2,6 +2,7 @@ import {
   base64ToBytes,
   decodeMeasurementPayload,
   decodeWeightNotification,
+  describeFrame,
   Esn00PacketType,
   Esn00Unit,
   measurementToGrams,
@@ -123,5 +124,21 @@ describe('decodeWeightNotification', () => {
     const bytes = buildMeasurementFrame(SETTLED_235_5G);
     bytes[bytes.length - 1] ^= 0xff;
     expect(decodeWeightNotification(bytesToBase64(bytes))).toBeNull();
+  });
+});
+
+describe('describeFrame', () => {
+  it('summarizes a decoded measurement frame', () => {
+    const base64 = bytesToBase64(buildMeasurementFrame(SETTLED_235_5G));
+    const summary = describeFrame(base64);
+    expect(summary).toContain('type=0xd0');
+    expect(summary).toContain('unit=0x0');
+    expect(summary).toContain('settled=true');
+    expect(summary).toContain('grams=235.5');
+  });
+
+  it('still summarizes an unparseable frame instead of throwing', () => {
+    const summary = describeFrame(bytesToBase64([0x00, 0x01, 0x02]));
+    expect(summary).toContain('unparsed');
   });
 });

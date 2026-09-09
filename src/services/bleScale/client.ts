@@ -1,10 +1,9 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { BleManager, type Device, type Subscription } from 'react-native-ble-plx';
 
-import { decodeWeightNotification, ESN00_NOTIFY_CHARACTERISTIC_UUID, ESN00_SERVICE_UUID } from './protocol';
+import { decodeWeightNotification, describeFrame, ESN00_NOTIFY_CHARACTERISTIC_UUID, ESN00_SERVICE_UUID } from './protocol';
 
-/** Flip on to log raw BLE notification bytes while debugging a real ESN00. */
-const DEBUG_LOG_RAW_PACKETS = false;
+const MAX_DEBUG_FRAMES = 8;
 
 let manager: BleManager | null = null;
 function getManager(): BleManager {
@@ -68,15 +67,21 @@ export async function scanForScale(timeoutMs: number): Promise<ScannedScale | nu
   });
 }
 
+export interface ScaleReadResult {
+  grams: number | null;
+  /** Human-readable descriptions of the last few raw notifications seen — diagnostic tooling while the ESN00 protocol gets confirmed against real hardware. */
+  frames: string[];
+}
+
 /**
  * Connects to a previously paired scale by id, waits for a settled weight
- * reading, then disconnects. Resolves null on any failure (permission
+ * reading, then disconnects. Resolves grams: null on any failure (permission
  * denied, connection failure, timeout with no settled reading) rather than
  * throwing, so callers can always fall back to manual entry.
  */
-export async function readWeightGrams(deviceId: string, timeoutMs: number): Promise<number | null> {
+export async function readWeightGrams(deviceId: string, timeoutMs: number): Promise<ScaleReadResult> {
   const hasPermission = await ensureBlePermissions();
-  if (!hasPermission) return null;
+  if (!hasPermission) return { grams: null, frames: [] };
 
   const bleManager = getManager();
   let device: Device;
@@ -84,19 +89,20 @@ export async function readWeightGrams(deviceId: string, timeoutMs: number): Prom
     device = await bleManager.connectToDevice(deviceId, { timeout: timeoutMs });
     await device.discoverAllServicesAndCharacteristics();
   } catch {
-    return null;
+    return { grams: null, frames: [] };
   }
 
   return new Promise((resolve) => {
     let finished = false;
     let subscription: Subscription | null = null;
+    const frames: string[] = [];
 
-    const finish = (result: number | null) => {
+    const finish = (grams: number | null) => {
       if (finished) return;
       finished = true;
       subscription?.remove();
       device.cancelConnection().catch(() => {});
-      resolve(result);
+      resolve({ grams, frames });
     };
 
     const timer = setTimeout(() => finish(null), timeoutMs);
@@ -106,9 +112,10 @@ export async function readWeightGrams(deviceId: string, timeoutMs: number): Prom
       ESN00_NOTIFY_CHARACTERISTIC_UUID,
       (error, characteristic) => {
         if (finished || error || !characteristic?.value) return;
-        if (DEBUG_LOG_RAW_PACKETS) {
-          console.log('[bleScale] raw notification', characteristic.value);
-        }
+
+        frames.push(describeFrame(characteristic.value));
+        if (frames.length > MAX_DEBUG_FRAMES) frames.shift();
+
         const grams = decodeWeightNotification(characteristic.value);
         if (grams != null) {
           clearTimeout(timer);

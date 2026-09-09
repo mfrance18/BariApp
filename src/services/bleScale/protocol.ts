@@ -119,3 +119,27 @@ export function decodeWeightNotification(base64Value: string): number | null {
   if (!measurement || !measurement.settled) return null;
   return measurementToGrams(measurement);
 }
+
+/**
+ * Human-readable one-line summary of a raw notification, for diagnosing a
+ * real scale's actual byte layout against what this protocol module
+ * assumes — temporary tooling until the ESN00 protocol is fully confirmed.
+ */
+export function describeFrame(base64Value: string): string {
+  const bytes = base64ToBytes(base64Value);
+  const frame = parseEsn00Frame(bytes);
+  if (!frame) return `unparsed bytes=[${bytes.join(',')}]`;
+
+  const typeHex = `0x${frame.type.toString(16).padStart(2, '0')}`;
+  const payloadHex = frame.payload.map((b) => b.toString(16).padStart(2, '0')).join(' ');
+  let summary = `type=${typeHex} len=${frame.payload.length} payload=[${payloadHex}] checksumValid=${frame.checksumValid}`;
+
+  if (frame.type === Esn00PacketType.MEASUREMENT) {
+    const measurement = decodeMeasurementPayload(frame.payload);
+    if (measurement) {
+      const grams = measurementToGrams(measurement);
+      summary += ` | signedValue=${measurement.signedValue} unit=0x${measurement.unit.toString(16)} settled=${measurement.settled} grams=${grams}`;
+    }
+  }
+  return summary;
+}
