@@ -8,7 +8,15 @@ import { createEntry } from '../../src/db/repositories/mealLogRepo';
 import { getReferenceWeightG } from '../../src/services/nutrition/scaling';
 import type { MealType } from '../../src/services/nutrition/totals';
 import { todayLogDateKey } from '../../src/utils/date';
-import { isWeighableUnit } from '../../src/utils/servingUnits';
+import { gramsToServing, isWeighableUnit } from '../../src/utils/servingUnits';
+
+// OFF-prefilled servingWeightG (see openFoodFacts/navigation.ts) arrives in
+// grams, but the weight equivalent is always shown in oz by default.
+function offWeightGramsToOzInput(servingWeightG?: string): string {
+  if (!servingWeightG) return '';
+  const oz = gramsToServing(Number(servingWeightG), 'oz');
+  return oz != null ? String(Math.round(oz * 100) / 100) : '';
+}
 
 export default function NewFoodScreen() {
   const params = useLocalSearchParams<
@@ -28,8 +36,8 @@ export default function NewFoodScreen() {
     brand: params.brand ?? '',
     servingAmount: params.servingAmount ?? EMPTY_FOOD_FORM_VALUES.servingAmount,
     servingUnit: params.servingUnit ?? EMPTY_FOOD_FORM_VALUES.servingUnit,
-    servingWeightAmount: params.servingWeightG ?? '',
-    servingWeightUnit: params.servingWeightG ? 'g' : '',
+    servingWeightAmount: offWeightGramsToOzInput(params.servingWeightG),
+    servingWeightUnit: 'oz',
     calories: params.calories ?? '',
     proteinG: params.proteinG ?? '',
     carbsG: params.carbsG ?? '',

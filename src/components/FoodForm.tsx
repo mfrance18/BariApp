@@ -34,7 +34,7 @@ export const EMPTY_FOOD_FORM_VALUES: FoodFormValues = {
   servingAmount: '1',
   servingUnit: '',
   servingWeightAmount: '',
-  servingWeightUnit: '',
+  servingWeightUnit: 'oz',
   calories: '',
   proteinG: '',
   carbsG: '',

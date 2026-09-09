@@ -5,16 +5,21 @@ import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { FoodForm, type FoodFormValues, type ParsedFoodValues } from '../../src/components/FoodForm';
 import { deleteFood, getFoodById, updateFood, type Food } from '../../src/db/repositories/foodsRepo';
 import { colors } from '../../src/theme/theme';
+import { gramsToServing } from '../../src/utils/servingUnits';
 
 function foodToFormValues(food: Food): FoodFormValues {
+  // Only grams are persisted, but the weight equivalent is always shown (and
+  // editable) in oz by default — matches the rest of the app defaulting to
+  // oz for food weights, while still accepting any other unit on input.
+  const weightOz = food.servingWeightG != null ? gramsToServing(food.servingWeightG, 'oz') : null;
   return {
     name: food.name,
     brand: food.brand ?? '',
     barcode: food.barcode ?? '',
     servingAmount: String(food.servingAmount),
     servingUnit: food.servingUnit,
-    servingWeightAmount: food.servingWeightG != null ? String(food.servingWeightG) : '',
-    servingWeightUnit: food.servingWeightG != null ? 'g' : '',
+    servingWeightAmount: weightOz != null ? String(Math.round(weightOz * 100) / 100) : '',
+    servingWeightUnit: 'oz',
     calories: String(food.calories),
     proteinG: String(food.proteinG),
     carbsG: String(food.carbsG),
