@@ -16,6 +16,12 @@ import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../..
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { formatDisplayDate, formatTimeOfDay, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz } from '../../src/utils/units';
+import { gramsToServing } from '../../src/utils/servingUnits';
+
+function formatWeightOz(weightG: number): string {
+  const oz = gramsToServing(weightG, 'oz') ?? weightG;
+  return `${Math.round(oz * 10) / 10} oz`;
+}
 
 const KG_TO_LB = 2.20462;
 
@@ -324,7 +330,8 @@ function MealSection({
               >
                 <Text style={styles.entryName}>{entry.itemName}</Text>
                 <Text style={styles.entrySubtext}>
-                  {entry.weightG != null ? `${entry.weightG} g` : `${entry.quantityAmount} ${entry.quantityUnit}`} ·{' '}
+                  {entry.weightG != null ? formatWeightOz(entry.weightG) : `${entry.quantityAmount} ${entry.quantityUnit}`}{' '}
+                  ·{' '}
                   {Math.round(entry.calories)} kcal
                 </Text>
               </TouchableOpacity>

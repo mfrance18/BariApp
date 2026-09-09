@@ -54,7 +54,7 @@ export default function WeighScreen() {
   }>();
   const queryClient = useQueryClient();
   const [weightInput, setWeightInput] = useState('');
-  const [weightUnit, setWeightUnit] = useState<WeightUnit>('g');
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>('oz');
   const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
   const [scaleError, setScaleError] = useState<string | null>(null);
@@ -117,8 +117,10 @@ export default function WeighScreen() {
     if (existingEntryQuery.data.quantityAmount != null) {
       setServingsInput(String(existingEntryQuery.data.quantityAmount));
     } else if (existingEntryQuery.data.weightG != null) {
-      setWeightUnit('g');
-      setWeightInput(String(existingEntryQuery.data.weightG));
+      const grams = existingEntryQuery.data.weightG;
+      const displayAmount = gramsToServing(grams, 'oz') ?? grams;
+      setWeightUnit('oz');
+      setWeightInput(String(Math.round(displayAmount * 100) / 100));
     }
   }, [existingEntryQuery.data]);
 
