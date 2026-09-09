@@ -477,6 +477,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   statCard: {
+    flex: 1,
     alignItems: 'flex-start',
     gap: 4,
     padding: spacing.md,
