@@ -186,7 +186,7 @@ export default function DashboardScreen() {
 
                 <View style={styles.fluidStatsRow}>
                   <FluidStat label="Goal" value={Math.round(mlToOz(fluidGoalMl))} />
-                  <FluidStat label="Logged" value={Math.round(mlToOz(fluidTotalMl))} />
+                  <FluidStat label="Logged" value={Math.round(mlToOz(fluidTotalMl))} highlight />
                   <FluidStat
                     label="Remaining"
                     value={Math.max(0, Math.round(mlToOz(fluidGoalMl) - mlToOz(fluidTotalMl)))}
@@ -286,10 +286,10 @@ function RingStat({ label, value, highlight }: { label: string; value: number; h
   );
 }
 
-function FluidStat({ label, value }: { label: string; value: number }) {
+function FluidStat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
     <View style={styles.fluidStat}>
-      <Text style={styles.fluidStatValue}>{value}</Text>
+      <Text style={[styles.fluidStatValue, highlight && styles.fluidStatValueHighlight]}>{value}</Text>
       <Text style={styles.fluidStatLabel}>{label}</Text>
     </View>
   );
@@ -535,7 +535,6 @@ const styles = StyleSheet.create({
   },
   fluidCard: {
     alignItems: 'center',
-    justifyContent: 'center',
   },
   fluidStatsRow: {
     flexDirection: 'row',
@@ -551,6 +550,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  fluidStatValueHighlight: {
+    color: colors.fluid,
   },
   fluidStatLabel: {
     ...typography.caption,
