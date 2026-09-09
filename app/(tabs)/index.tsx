@@ -92,6 +92,7 @@ export default function DashboardScreen() {
     queryKey: ['dailyActivity', logDate],
     queryFn: () => getDailyActivity(logDate),
     enabled: !!healthAccess,
+    refetchInterval: 30_000,
   });
 
   const { data: medsChecklist } = useQuery({
