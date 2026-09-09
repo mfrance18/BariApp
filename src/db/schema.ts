@@ -193,5 +193,8 @@ export const appSettings = sqliteTable('app_settings', {
   themeAccent: text('theme_accent', { enum: ['blue', 'purple', 'red', 'green'] })
     .notNull()
     .default('blue'),
+  themeBase: text('theme_base', { enum: ['blue', 'purple', 'red', 'green'] })
+    .notNull()
+    .default('blue'),
   ...timestamps,
 });

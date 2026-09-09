@@ -9,7 +9,7 @@ import { Card } from '../../src/components/ui/Card';
 import { SegmentedControl } from '../../src/components/ui/SegmentedControl';
 import { getSettings, updateSettings, type AppSettings } from '../../src/db/repositories/settingsRepo';
 import { login, logout, syncWeightHistoryToDb } from '../../src/services/vesync/adapter';
-import { ACCENT_PRESETS, colors, radius, spacing, typography, type AccentName } from '../../src/theme/theme';
+import { ACCENT_PRESETS, BASE_PRESETS, colors, radius, spacing, typography, type AccentName } from '../../src/theme/theme';
 import { mlToOz, ozToMl } from '../../src/utils/units';
 
 const WEIGHT_UNIT_OPTIONS: { label: string; value: AppSettings['weightUnit'] }[] = [
@@ -87,10 +87,10 @@ export default function SettingsScreen() {
 
   // Colors are computed once at module load (theme.ts reads them synchronously
   // from SQLite), not per-render, so a plain re-render can't pick up a new
-  // accent — reloading the whole JS bundle is what actually applies it.
+  // theme/accent — reloading the whole JS bundle is what actually applies it.
   const themeMutation = useMutation({
-    mutationFn: async (accent: AccentName) => {
-      await updateSettings({ themeAccent: accent });
+    mutationFn: async ({ field, value }: { field: 'themeAccent' | 'themeBase'; value: AccentName }) => {
+      await updateSettings({ [field]: value });
       const Updates = await import('expo-updates');
       if (!Updates.isEnabled) {
         throw new Error('MANUAL_RESTART');
@@ -99,7 +99,7 @@ export default function SettingsScreen() {
     },
     onError: (error: Error) => {
       if (error.message === 'MANUAL_RESTART') {
-        Alert.alert('Theme saved', 'Fully close and reopen the app to see the new theme.');
+        Alert.alert('Theme saved', 'Fully close and reopen the app to see the change.');
       } else {
         Alert.alert('Could not switch theme', error.message);
       }
@@ -228,32 +228,22 @@ export default function SettingsScreen() {
         />
       </Section>
       <Section title="Theme">
-        <View style={styles.swatchRow}>
-          {(Object.keys(ACCENT_PRESETS) as AccentName[]).map((accent) => {
-            const selected = settings.themeAccent === accent;
-            return (
-              <TouchableOpacity
-                key={accent}
-                style={styles.swatchButton}
-                onPress={() => themeMutation.mutate(accent)}
-                disabled={themeMutation.isPending}
-              >
-                <View
-                  style={[
-                    styles.swatchCircle,
-                    { backgroundColor: ACCENT_PRESETS[accent].primary },
-                    selected && styles.swatchCircleSelected,
-                  ]}
-                >
-                  {selected && <Ionicons name="checkmark" size={18} color="#fff" />}
-                </View>
-                <Text style={styles.swatchLabel}>{ACCENT_LABELS[accent]}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {themeMutation.isPending && <Text style={styles.helperText}>Applying theme…</Text>}
+        <SwatchPicker
+          selected={settings.themeBase}
+          getColor={(name) => BASE_PRESETS[name].card}
+          onSelect={(value) => themeMutation.mutate({ field: 'themeBase', value })}
+          disabled={themeMutation.isPending}
+        />
       </Section>
+      <Section title="Accent">
+        <SwatchPicker
+          selected={settings.themeAccent}
+          getColor={(name) => ACCENT_PRESETS[name].primary}
+          onSelect={(value) => themeMutation.mutate({ field: 'themeAccent', value })}
+          disabled={themeMutation.isPending}
+        />
+      </Section>
+      {themeMutation.isPending && <Text style={styles.helperText}>Applying…</Text>}
     </KeyboardAwareScrollView>
   );
 }
@@ -264,6 +254,41 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
       {children}
     </Card>
+  );
+}
+
+function SwatchPicker({
+  selected,
+  getColor,
+  onSelect,
+  disabled,
+}: {
+  selected: AccentName;
+  getColor: (name: AccentName) => string;
+  onSelect: (value: AccentName) => void;
+  disabled: boolean;
+}) {
+  return (
+    <View style={styles.swatchRow}>
+      {(Object.keys(ACCENT_LABELS) as AccentName[]).map((name) => {
+        const isSelected = selected === name;
+        return (
+          <TouchableOpacity
+            key={name}
+            style={styles.swatchButton}
+            onPress={() => onSelect(name)}
+            disabled={disabled}
+          >
+            <View
+              style={[styles.swatchCircle, { backgroundColor: getColor(name) }, isSelected && styles.swatchCircleSelected]}
+            >
+              {isSelected && <Ionicons name="checkmark" size={18} color="#fff" />}
+            </View>
+            <Text style={styles.swatchLabel}>{ACCENT_LABELS[name]}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
   );
 }
 

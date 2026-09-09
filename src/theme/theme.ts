@@ -2,89 +2,63 @@ import { sqliteDb } from '../db/client';
 
 export type AccentName = 'blue' | 'purple' | 'red' | 'green';
 
-interface ThemePreset {
-  primary: string;
-  primaryDark: string;
-  primaryLight: string;
-  background: string;
-  card: string;
-  border: string;
-}
+/** Accent color presets — buttons, icons, active states. Independent of the base theme. */
+export const ACCENT_PRESETS: Record<AccentName, { primary: string; primaryDark: string; primaryLight: string }> = {
+  blue: { primary: '#3D9BFF', primaryDark: '#1C5FC7', primaryLight: '#1B3A5C' },
+  purple: { primary: '#A374FF', primaryDark: '#6B3FD1', primaryLight: '#332457' },
+  red: { primary: '#FF6B6B', primaryDark: '#D13F3F', primaryLight: '#4A2323' },
+  green: { primary: '#3ED598', primaryDark: '#1FA06D', primaryLight: '#12402F' },
+};
 
-/** Full theme presets a user can pick between in Settings — both the accent and the dark base tint change together. */
-export const ACCENT_PRESETS: Record<AccentName, ThemePreset> = {
-  blue: {
-    primary: '#3D9BFF',
-    primaryDark: '#1C5FC7',
-    primaryLight: '#1B3A5C',
-    background: '#0A1929',
-    card: '#122840',
-    border: '#22405E',
-  },
-  purple: {
-    primary: '#A374FF',
-    primaryDark: '#6B3FD1',
-    primaryLight: '#332457',
-    background: '#170A29',
-    card: '#241240',
-    border: '#3D225E',
-  },
-  red: {
-    primary: '#FF6B6B',
-    primaryDark: '#D13F3F',
-    primaryLight: '#4A2323',
-    background: '#290A0A',
-    card: '#401212',
-    border: '#5E2222',
-  },
-  green: {
-    primary: '#3ED598',
-    primaryDark: '#1FA06D',
-    primaryLight: '#12402F',
-    background: '#0A2916',
-    card: '#124028',
-    border: '#225E3D',
-  },
+/** Base theme presets — the dark background/card/border tint. Independent of the accent. */
+export const BASE_PRESETS: Record<AccentName, { background: string; card: string; border: string }> = {
+  blue: { background: '#0A1929', card: '#122840', border: '#22405E' },
+  purple: { background: '#170A29', card: '#241240', border: '#3D225E' },
+  red: { background: '#290A0A', card: '#401212', border: '#5E2222' },
+  green: { background: '#0A2916', card: '#124028', border: '#225E3D' },
 };
 
 /**
- * Reads the saved accent preference synchronously, straight from SQLite,
- * so it's available before this module's StyleSheet.create() calls (and
- * every screen's, since they all import `colors` from here) run at import
- * time — well before the async migration/query hooks in app/_layout.tsx
- * complete. Changing the accent in Settings persists the new value then
- * calls Updates.reloadAsync() to re-run the whole JS bundle, which is what
- * actually applies it (React re-renders alone can't, since StyleSheet.create
- * objects are computed once at module load, not per-render).
- * Falls back to 'blue' if the column/table doesn't exist yet (very first
+ * Reads the saved theme/accent preference synchronously, straight from
+ * SQLite, so it's available before this module's StyleSheet.create() calls
+ * (and every screen's, since they all import `colors` from here) run at
+ * import time — well before the async migration/query hooks in
+ * app/_layout.tsx complete. Changing either preset in Settings persists the
+ * new value then calls Updates.reloadAsync() to re-run the whole JS bundle,
+ * which is what actually applies it (React re-renders alone can't, since
+ * StyleSheet.create objects are computed once at module load, not per-render).
+ * Falls back to 'blue'/'blue' if the columns don't exist yet (very first
  * launch after this feature shipped, before migrations have run) or any
  * other read error.
  */
-function readSavedAccent(): AccentName {
+function readSavedTheme(): { accent: AccentName; base: AccentName } {
+  const isAccentName = (v: unknown): v is AccentName =>
+    v === 'blue' || v === 'purple' || v === 'red' || v === 'green';
   try {
-    const row = sqliteDb.getFirstSync<{ theme_accent: string }>(
-      'SELECT theme_accent FROM app_settings WHERE id = 1',
+    const row = sqliteDb.getFirstSync<{ theme_accent: string; theme_base: string }>(
+      'SELECT theme_accent, theme_base FROM app_settings WHERE id = 1',
     );
-    const value = row?.theme_accent;
-    if (value === 'blue' || value === 'purple' || value === 'red' || value === 'green') {
-      return value;
-    }
-    return 'blue';
+    return {
+      accent: isAccentName(row?.theme_accent) ? row.theme_accent : 'blue',
+      base: isAccentName(row?.theme_base) ? row.theme_base : 'blue',
+    };
   } catch {
-    return 'blue';
+    return { accent: 'blue', base: 'blue' };
   }
 }
 
-const accent = ACCENT_PRESETS[readSavedAccent()];
+const saved = readSavedTheme();
+const accent = ACCENT_PRESETS[saved.accent];
+const base = BASE_PRESETS[saved.base];
 
 export const colors = {
   primary: accent.primary,
   primaryDark: accent.primaryDark,
   primaryLight: accent.primaryLight,
 
-  background: accent.background,
-  card: accent.card,
-  border: accent.border,
+  background: base.background,
+  card: base.card,
+  border: base.border,
 
   textPrimary: '#EDF3FA',
   textSecondary: '#9FB6CC',

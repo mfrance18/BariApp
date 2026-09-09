@@ -57,6 +57,13 @@
       "when": 1788900000000,
       "tag": "0007_theme_accent",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1788910000000,
+      "tag": "0008_theme_base",
+      "breakpoints": true
     }
   ]
 }
