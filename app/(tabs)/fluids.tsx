@@ -2,7 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Alert, FlatList, Modal, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
@@ -26,12 +38,12 @@ function formatOz(oz: number): string {
   return Number.isInteger(oz) ? String(oz) : oz.toFixed(1);
 }
 
+type FluidModalState = { mode: 'add'; amountOz: number | null } | { mode: 'edit'; entry: FluidLogEntry };
+
 export default function FluidsScreen() {
   const queryClient = useQueryClient();
   const logDate = todayLogDateKey();
-  const [customAmount, setCustomAmount] = useState('');
-  const [customLabel, setCustomLabel] = useState('');
-  const [editingEntry, setEditingEntry] = useState<FluidLogEntry | null>(null);
+  const [modalState, setModalState] = useState<FluidModalState | null>(null);
 
   const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
   const { data: entries } = useQuery({
@@ -40,25 +52,28 @@ export default function FluidsScreen() {
   });
 
   const addMutation = useMutation({
-    mutationFn: ({ amountOz, label }: { amountOz: number; label?: string }) =>
-      createEntry(ozToMl(amountOz), label),
+    mutationFn: ({ amountOz, label }: { amountOz: number; label: string }) =>
+      createEntry(ozToMl(amountOz), label || undefined),
     onSuccess: () => {
-      setCustomAmount('');
-      setCustomLabel('');
+      setModalState(null);
       queryClient.invalidateQueries({ queryKey: ['fluidLog', logDate] });
     },
+    onError: (error: Error) => Alert.alert('Could not add', error.message),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) => deleteEntry(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fluidLog', logDate] }),
+    onSuccess: () => {
+      setModalState(null);
+      queryClient.invalidateQueries({ queryKey: ['fluidLog', logDate] });
+    },
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, ...patch }: { id: number; amountMl: number; loggedAt: string; sourceLabel: string | null }) =>
       updateEntry(id, patch),
     onSuccess: () => {
-      setEditingEntry(null);
+      setModalState(null);
       queryClient.invalidateQueries({ queryKey: ['fluidLog', logDate] });
     },
     onError: (error: Error) => Alert.alert('Could not save', error.message),
@@ -98,7 +113,7 @@ export default function FluidsScreen() {
               <TouchableOpacity
                 key={oz}
                 style={styles.quickAddButton}
-                onPress={() => addMutation.mutate({ amountOz: oz })}
+                onPress={() => setModalState({ mode: 'add', amountOz: oz })}
               >
                 <Ionicons name="cafe-outline" size={16} color={colors.fluid} />
                 <Text style={styles.quickAddButtonText}>{oz} oz</Text>
@@ -106,49 +121,32 @@ export default function FluidsScreen() {
             ))}
           </View>
 
-          <View style={styles.customRow}>
-            <TextInput
-              style={[styles.input, styles.customAmountInput]}
-              placeholder="Amount (oz)"
-              placeholderTextColor={colors.textMuted}
-              keyboardType="decimal-pad"
-              value={customAmount}
-              onChangeText={setCustomAmount}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Name (optional)"
-              placeholderTextColor={colors.textMuted}
-              value={customLabel}
-              onChangeText={setCustomLabel}
-            />
-          </View>
           <AppButton
-            title="Add"
-            onPress={() => {
-              const value = Number(customAmount);
-              if (value > 0) addMutation.mutate({ amountOz: value, label: customLabel.trim() || undefined });
-            }}
+            title="Custom Amount"
+            variant="secondary"
+            onPress={() => setModalState({ mode: 'add', amountOz: null })}
           />
 
           {(entries ?? []).length > 0 && <Text style={styles.sectionLabel}>TODAY</Text>}
         </View>
       }
       renderItem={({ item }) => (
-        <FluidRow entry={item} onPress={() => setEditingEntry(item)} onDelete={() => deleteMutation.mutate(item.id)} />
+        <FluidRow
+          entry={item}
+          onPress={() => setModalState({ mode: 'edit', entry: item })}
+          onDelete={() => deleteMutation.mutate(item.id)}
+        />
       )}
       ListEmptyComponent={<Text style={styles.emptyText}>Nothing logged yet today</Text>}
     />
-    {editingEntry && (
-      <EditFluidModal
-        entry={editingEntry}
-        onClose={() => setEditingEntry(null)}
-        onSave={(patch) => updateMutation.mutate({ id: editingEntry.id, ...patch })}
-        onDelete={() => {
-          deleteMutation.mutate(editingEntry.id);
-          setEditingEntry(null);
-        }}
-        saving={updateMutation.isPending}
+    {modalState && (
+      <FluidModal
+        state={modalState}
+        onClose={() => setModalState(null)}
+        onAdd={(data) => addMutation.mutate(data)}
+        onUpdate={(id, patch) => updateMutation.mutate({ id, ...patch })}
+        onDelete={(id) => deleteMutation.mutate(id)}
+        saving={addMutation.isPending || updateMutation.isPending}
       />
     )}
     </KeyboardAvoidingScreen>
@@ -181,22 +179,27 @@ function FluidRow({
   );
 }
 
-function EditFluidModal({
-  entry,
+function FluidModal({
+  state,
   onClose,
-  onSave,
+  onAdd,
+  onUpdate,
   onDelete,
   saving,
 }: {
-  entry: FluidLogEntry;
+  state: FluidModalState;
   onClose: () => void;
-  onSave: (patch: { amountMl: number; loggedAt: string; sourceLabel: string | null }) => void;
-  onDelete: () => void;
+  onAdd: (data: { amountOz: number; label: string }) => void;
+  onUpdate: (id: number, patch: { amountMl: number; loggedAt: string; sourceLabel: string | null }) => void;
+  onDelete: (id: number) => void;
   saving: boolean;
 }) {
-  const [amountInput, setAmountInput] = useState(formatOz(mlToOz(entry.amountMl)));
-  const [label, setLabel] = useState(entry.sourceLabel ?? '');
-  const [loggedAt, setLoggedAt] = useState(new Date(entry.loggedAt));
+  const isEdit = state.mode === 'edit';
+  const [amountInput, setAmountInput] = useState(
+    isEdit ? formatOz(mlToOz(state.entry.amountMl)) : state.amountOz != null ? formatOz(state.amountOz) : '',
+  );
+  const [label, setLabel] = useState(isEdit ? (state.entry.sourceLabel ?? '') : '');
+  const [loggedAt, setLoggedAt] = useState(isEdit ? new Date(state.entry.loggedAt) : new Date());
   const [showPicker, setShowPicker] = useState(Platform.OS === 'ios');
 
   function handleTimeChange(event: DateTimePickerEvent, date?: Date) {
@@ -208,61 +211,80 @@ function EditFluidModal({
   function handleSave() {
     const amountOz = Number(amountInput);
     if (!amountOz || amountOz <= 0) return;
-    onSave({ amountMl: ozToMl(amountOz), loggedAt: loggedAt.toISOString(), sourceLabel: label.trim() || null });
+    if (isEdit) {
+      onUpdate(state.entry.id, { amountMl: ozToMl(amountOz), loggedAt: loggedAt.toISOString(), sourceLabel: label.trim() || null });
+    } else {
+      onAdd({ amountOz, label: label.trim() });
+    }
   }
 
   return (
     <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
         <Card style={styles.modalCard}>
-          <Text style={styles.modalTitle}>Edit Fluid</Text>
+          <Text style={styles.modalTitle}>{isEdit ? 'Edit Fluid' : 'Add Fluid'}</Text>
 
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Amount (oz)</Text>
-            <TextInput
-              style={styles.input}
-              keyboardType="decimal-pad"
-              value={amountInput}
-              onChangeText={setAmountInput}
-              selectTextOnFocus
-            />
-          </View>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Amount (oz)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={amountInput}
+                onChangeText={setAmountInput}
+                selectTextOnFocus
+                autoFocus={!isEdit && state.amountOz == null}
+              />
+            </View>
 
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Name (optional)</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Gatorade, Protein shake"
-              placeholderTextColor={colors.textMuted}
-              value={label}
-              onChangeText={setLabel}
-            />
-          </View>
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Name (optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Gatorade, Protein shake"
+                placeholderTextColor={colors.textMuted}
+                value={label}
+                onChangeText={setLabel}
+              />
+            </View>
 
-          <View style={styles.field}>
-            <Text style={styles.fieldLabel}>Time</Text>
-            {Platform.OS === 'android' ? (
-              <TouchableOpacity style={styles.timeButton} onPress={() => setShowPicker(true)}>
-                <Ionicons name="time-outline" size={18} color={colors.primary} />
-                <Text style={styles.timeButtonText}>
-                  {loggedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-            ) : (
-              <DateTimePicker value={loggedAt} mode="time" display="spinner" onChange={handleTimeChange} />
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Time</Text>
+              {Platform.OS === 'android' ? (
+                <TouchableOpacity style={styles.timeButton} onPress={() => setShowPicker(true)}>
+                  <Ionicons name="time-outline" size={18} color={colors.primary} />
+                  <Text style={styles.timeButtonText}>
+                    {loggedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <DateTimePicker value={loggedAt} mode="time" display="spinner" onChange={handleTimeChange} />
+              )}
+            </View>
+            {Platform.OS === 'android' && showPicker && (
+              <DateTimePicker value={loggedAt} mode="time" display="default" onChange={handleTimeChange} />
             )}
-          </View>
-          {Platform.OS === 'android' && showPicker && (
-            <DateTimePicker value={loggedAt} mode="time" display="default" onChange={handleTimeChange} />
-          )}
+          </ScrollView>
 
-          <AppButton title={saving ? 'Saving…' : 'Save'} onPress={handleSave} disabled={saving} />
-          <View style={styles.modalButtonRow}>
-            <AppButton title="Delete" variant="danger" style={styles.flexButton} onPress={onDelete} />
-            <AppButton title="Cancel" variant="secondary" style={styles.flexButton} onPress={onClose} />
-          </View>
+          <AppButton title={saving ? 'Saving…' : isEdit ? 'Save' : 'Add'} onPress={handleSave} disabled={saving} />
+          {isEdit ? (
+            <View style={styles.modalButtonRow}>
+              <AppButton
+                title="Delete"
+                variant="danger"
+                style={styles.flexButton}
+                onPress={() => onDelete(state.entry.id)}
+              />
+              <AppButton title="Cancel" variant="secondary" style={styles.flexButton} onPress={onClose} />
+            </View>
+          ) : (
+            <AppButton title="Cancel" variant="secondary" onPress={onClose} />
+          )}
         </Card>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -328,13 +350,6 @@ const styles = StyleSheet.create({
     color: colors.fluid,
     fontWeight: '700',
   },
-  customRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  customAmountInput: {
-    flex: 0.6,
-  },
   input: {
     flex: 1,
     backgroundColor: colors.card,
@@ -373,6 +388,10 @@ const styles = StyleSheet.create({
   modalCard: {
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
+    gap: spacing.md,
+    maxHeight: '90%',
+  },
+  modalScrollContent: {
     gap: spacing.md,
   },
   modalTitle: {
