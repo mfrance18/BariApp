@@ -10,7 +10,6 @@ import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
-import { getSettings } from '../../../src/db/repositories/settingsRepo';
 import {
   computeRecipeTotals,
   getReferenceWeightG,
@@ -21,7 +20,6 @@ import {
   type NutritionFields,
 } from '../../../src/services/nutrition/scaling';
 import type { MealType } from '../../../src/services/nutrition/totals';
-import { getLatestWeight } from '../../../src/services/vesync/adapter';
 import { colors, radius, spacing, typography } from '../../../src/theme/theme';
 import { todayLogDateKey } from '../../../src/utils/date';
 import { gramsToServing, isWeighableUnit, servingToGrams } from '../../../src/utils/servingUnits';
@@ -57,7 +55,6 @@ export default function WeighScreen() {
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('oz');
   const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale'>('manual');
-  const [scaleError, setScaleError] = useState<string | null>(null);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
@@ -67,23 +64,6 @@ export default function WeighScreen() {
     queryKey: ['mealLogEntry', entryId],
     queryFn: () => getEntryById(Number(entryId)),
     enabled: isEditing,
-  });
-
-  const settingsQuery = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
-
-  const pullFromScaleMutation = useMutation({
-    mutationFn: () => getLatestWeight(),
-    onSuccess: (reading) => {
-      if (!reading) {
-        setScaleError("Couldn't read the scale — enter weight manually.");
-        return;
-      }
-      setScaleError(null);
-      const grams = reading.weightKg * 1000;
-      const displayAmount = gramsToServing(grams, weightUnit) ?? grams;
-      setWeightInput(String(Math.round(displayAmount * 10) / 10));
-      setWeightSource('vesync_scale');
-    },
   });
 
   const foodQuery = useQuery({
@@ -272,16 +252,7 @@ export default function WeighScreen() {
               />
             </View>
           </View>
-          {settingsQuery.data?.vesyncConnected && (
-            <AppButton
-              title={pullFromScaleMutation.isPending ? 'Reading scale…' : 'Pull from Scale'}
-              variant="secondary"
-              onPress={() => pullFromScaleMutation.mutate()}
-              disabled={pullFromScaleMutation.isPending}
-            />
-          )}
           {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
-          {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
         </Card>
       )}
 
