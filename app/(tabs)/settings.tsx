@@ -6,16 +6,9 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
-import { SegmentedControl } from '../../src/components/ui/SegmentedControl';
-import { getSettings, updateSettings, type AppSettings } from '../../src/db/repositories/settingsRepo';
-import { login, logout, syncWeightHistoryToDb } from '../../src/services/vesync/adapter';
+import { getSettings, updateSettings } from '../../src/db/repositories/settingsRepo';
 import { ACCENT_PRESETS, BASE_PRESETS, colors, radius, spacing, typography, type AccentName } from '../../src/theme/theme';
 import { mlToOz, ozToMl } from '../../src/utils/units';
-
-const WEIGHT_UNIT_OPTIONS: { label: string; value: AppSettings['weightUnit'] }[] = [
-  { label: 'lb', value: 'lb' },
-  { label: 'kg', value: 'kg' },
-];
 
 const ACCENT_LABELS: Record<AccentName, string> = {
   blue: 'Blue',
@@ -31,11 +24,6 @@ export default function SettingsScreen() {
     queryFn: getSettings,
   });
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const passwordRef = useRef<TextInput>(null);
-
   const [caloriesInput, setCaloriesInput] = useState('');
   const [proteinInput, setProteinInput] = useState('');
   const [fluidOzInput, setFluidOzInput] = useState('');
@@ -50,26 +38,6 @@ export default function SettingsScreen() {
     }
   }, [settings]);
 
-  const loginMutation = useMutation({
-    mutationFn: () => login({ email, password }),
-    onSuccess: (result) => {
-      if (result.ok) {
-        setPassword('');
-        queryClient.invalidateQueries({ queryKey: ['app_settings'] });
-      }
-    },
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: () => logout(),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_settings'] }),
-  });
-
-  const syncMutation = useMutation({
-    mutationFn: () => syncWeightHistoryToDb(30),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['weightLog'] }),
-  });
-
   const saveGoalsMutation = useMutation({
     mutationFn: () =>
       updateSettings({
@@ -77,11 +45,6 @@ export default function SettingsScreen() {
         dailyProteinGoalG: Number(proteinInput),
         dailyFluidGoalMl: Math.round(ozToMl(Number(fluidOzInput))),
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_settings'] }),
-  });
-
-  const weightUnitMutation = useMutation({
-    mutationFn: (unit: AppSettings['weightUnit']) => updateSettings({ weightUnit: unit }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_settings'] }),
   });
 
@@ -131,80 +94,6 @@ export default function SettingsScreen() {
       extraScrollHeight={120}
       keyboardOpeningTime={0}
     >
-      <Section title="VeSync Scale">
-        {settings.vesyncConnected ? (
-          <>
-            <Text style={styles.rowText}>Connected as {settings.vesyncEmail}</Text>
-            <View style={styles.buttonRow}>
-              <AppButton
-                title={syncMutation.isPending ? 'Syncing…' : 'Sync Now'}
-                variant="secondary"
-                style={styles.flexButton}
-                onPress={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-              />
-              <AppButton
-                title="Disconnect"
-                variant="danger"
-                style={styles.flexButton}
-                onPress={() => logoutMutation.mutate()}
-              />
-            </View>
-            {syncMutation.data && (
-              <Text style={styles.helperText}>Synced {syncMutation.data.synced} new reading(s).</Text>
-            )}
-          </>
-        ) : (
-          <>
-            <TextInput
-              style={styles.input}
-              placeholder="VeSync email"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={email}
-              onChangeText={setEmail}
-              returnKeyType="next"
-              onSubmitEditing={() => passwordRef.current?.focus()}
-              blurOnSubmit={false}
-            />
-            <View style={styles.passwordRow}>
-              <TextInput
-                ref={passwordRef}
-                style={[styles.input, styles.passwordInput]}
-                placeholder="Password"
-                placeholderTextColor={colors.textMuted}
-                secureTextEntry={!showPassword}
-                value={password}
-                onChangeText={setPassword}
-                returnKeyType="done"
-                onSubmitEditing={() => {
-                  if (email && password && !loginMutation.isPending) loginMutation.mutate();
-                }}
-              />
-              <TouchableOpacity
-                style={styles.eyeButton}
-                onPress={() => setShowPassword((prev) => !prev)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-off' : 'eye'}
-                  size={20}
-                  color={colors.textMuted}
-                />
-              </TouchableOpacity>
-            </View>
-            <AppButton
-              title={loginMutation.isPending ? 'Connecting…' : 'Connect'}
-              onPress={() => loginMutation.mutate()}
-              disabled={loginMutation.isPending || !email || !password}
-            />
-            {loginMutation.data && !loginMutation.data.ok && (
-              <Text style={styles.errorText}>{loginMutation.data.error}</Text>
-            )}
-          </>
-        )}
-      </Section>
       <Section title="Daily Goals">
         <GoalField label="Calories" unit="kcal" value={caloriesInput} onChangeText={setCaloriesInput} />
         <GoalField label="Protein" unit="g" value={proteinInput} onChangeText={setProteinInput} />
@@ -218,14 +107,6 @@ export default function SettingsScreen() {
         {saveGoalsMutation.isSuccess && !goalsDirty && (
           <Text style={styles.helperText}>Goals saved.</Text>
         )}
-      </Section>
-      <Section title="Units">
-        <Text style={styles.rowText}>Weight unit</Text>
-        <SegmentedControl
-          options={WEIGHT_UNIT_OPTIONS}
-          value={settings.weightUnit}
-          onChange={(unit) => weightUnitMutation.mutate(unit)}
-        />
       </Section>
       <Section title="Theme">
         <SwatchPicker
@@ -371,33 +252,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     minWidth: 32,
-  },
-  input: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  passwordRow: {
-    position: 'relative',
-    justifyContent: 'center',
-  },
-  passwordInput: {
-    paddingRight: spacing.xl + spacing.md,
-  },
-  eyeButton: {
-    position: 'absolute',
-    right: spacing.md,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  flexButton: {
-    flex: 1,
   },
   helperText: {
     fontSize: 13,
