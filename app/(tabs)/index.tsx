@@ -301,10 +301,20 @@ function MealSection({
     <Card style={styles.mealSection}>
       <View style={styles.mealHeaderRow}>
         <View style={styles.mealHeaderLeft}>
-          <Ionicons name={MEAL_ICONS[meal]} size={18} color={colors.textSecondary} />
+          <Ionicons name={MEAL_ICONS[meal]} size={20} color={colors.primary} />
           <Text style={styles.mealLabel}>{MEAL_LABELS[meal]}</Text>
         </View>
-        <Text style={styles.mealTotalText}>{Math.round(mealTotal.calories)} kcal</Text>
+        <View style={styles.mealHeaderRight}>
+          {entries.length > 0 && (
+            <Text style={styles.mealTotalText}>{Math.round(mealTotal.calories)} kcal</Text>
+          )}
+          <TouchableOpacity
+            style={styles.logButton}
+            onPress={() => router.push({ pathname: '/log/[mealType]/pick-item', params: { mealType: meal, logDate } })}
+          >
+            <Text style={styles.logButtonText}>Log</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {entries.length === 0 ? (
@@ -313,6 +323,7 @@ function MealSection({
         entries.map((entry) => (
           <SwipeToDelete key={entry.id} onDelete={() => onDelete(entry.id)}>
             <View style={styles.entryRow}>
+              <Ionicons name={MEAL_ICONS[meal]} size={16} color={colors.textMuted} style={styles.entryIcon} />
               <TouchableOpacity
                 style={styles.entryTextGroup}
                 onPress={() =>
@@ -342,14 +353,6 @@ function MealSection({
           </SwipeToDelete>
         ))
       )}
-
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => router.push({ pathname: '/log/[mealType]/pick-item', params: { mealType: meal, logDate } })}
-      >
-        <Ionicons name="add-circle" size={18} color={colors.primary} />
-        <Text style={styles.addButtonText}>ADD FOOD</Text>
-      </TouchableOpacity>
     </Card>
   );
 }
@@ -553,23 +556,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
+  mealHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   mealLabel: {
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: '700',
     color: colors.textPrimary,
   },
   mealTotalText: {
     ...typography.caption,
   },
+  logButton: {
+    backgroundColor: colors.primaryLight,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  logButtonText: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
   emptyText: {
     color: colors.textMuted,
     fontSize: 13,
+    marginTop: spacing.xs,
   },
   entryRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 4,
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  entryIcon: {
+    opacity: 0.8,
   },
   entryTextGroup: {
     flex: 1,
@@ -581,18 +606,6 @@ const styles = StyleSheet.create({
   entrySubtext: {
     fontSize: 12,
     color: colors.textMuted,
-  },
-  addButton: {
-    marginTop: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    alignSelf: 'flex-start',
-  },
-  addButtonText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 13,
-    letterSpacing: 0.3,
+    marginTop: 2,
   },
 });
