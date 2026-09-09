@@ -85,8 +85,12 @@ describe('measurementToGrams', () => {
     expect(measurementToGrams({ signedValue: 2355, unit: Esn00Unit.GRAMS, settled: true })).toBeCloseTo(235.5);
   });
 
-  it('converts ounces to grams', () => {
-    expect(measurementToGrams({ signedValue: 100, unit: Esn00Unit.OZ, settled: true })).toBeCloseTo(283.49523125);
+  it('divides the raw value by 100 for ounces', () => {
+    expect(measurementToGrams({ signedValue: 100, unit: Esn00Unit.OZ, settled: true })).toBeCloseTo(28.349523125);
+  });
+
+  it('matches a real ESN00 reading of 4.2oz (magnitude=410, confirming the x100 oz scale factor)', () => {
+    expect(measurementToGrams({ signedValue: 410, unit: Esn00Unit.OZ, settled: true })).toBeCloseTo(116.233, 2);
   });
 
   it('returns null for units other than grams/ounces', () => {

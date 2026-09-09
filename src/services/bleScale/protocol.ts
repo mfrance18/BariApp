@@ -8,14 +8,18 @@
  * just the piece BariApp needs — decoding the MEASUREMENT notification the
  * scale continuously broadcasts while a weight is on it — ported from the
  * published @metekcity/esn00-packet source (v2.0.0) and cross-checked
- * against its documented frame layout. Still worth confirming against the
- * real scale: flip DEBUG_LOG_RAW_PACKETS in client.ts if a reading looks
- * wrong.
+ * against its documented frame layout, then corrected against a real ESN00
+ * (see the oz scaling note below) using the debug tooling in client.ts's
+ * readWeightGrams (surfaced in the weigh screen's temporary debug panel).
  *
  * Frame layout: [4-byte header][1 type][1 length][length-byte payload][1 checksum]
  * Checksum = sum of (type + length + payload) bytes, mod 256.
  * MEASUREMENT (0xd0) payload (5 bytes): [sign][weight hi][weight lo][unit][settled]
- * Weight is the magnitude x10 (grams confirmed; other units unconfirmed).
+ * The magnitude's scale factor depends on the unit: confirmed against a real
+ * ESN00 as x10 for grams, but x100 for ounces (a scale reading 4.2oz sent
+ * magnitude=410, not 42) — the community protocol doc only confirmed grams
+ * and flagged other units as unverified, and this is the first place that
+ * mattered.
  */
 
 export const ESN00_SERVICE_UUID = '00001910-0000-1000-8000-00805f9b34fb';
@@ -78,14 +82,15 @@ export function decodeMeasurementPayload(payload: number[]): Esn00Measurement | 
 }
 
 /**
- * Converts a decoded measurement to grams. Only grams and ounces are
- * confirmed to use the x10 scaling the protocol documents, so any other
- * unit mode on the scale (ml, lb+oz, ...) returns null rather than guessing.
+ * Converts a decoded measurement to grams. Only grams (x10 scaling) and
+ * ounces (x100 scaling — confirmed against a real ESN00, see the module
+ * comment) are supported; any other unit mode on the scale (ml, lb+oz, ...)
+ * returns null rather than guessing at an unconfirmed scale factor.
  */
 export function measurementToGrams(measurement: Esn00Measurement): number | null {
-  const magnitude = Math.abs(measurement.signedValue) / 10;
-  if (measurement.unit === Esn00Unit.GRAMS) return magnitude;
-  if (measurement.unit === Esn00Unit.OZ) return magnitude * OZ_TO_G;
+  const rawValue = Math.abs(measurement.signedValue);
+  if (measurement.unit === Esn00Unit.GRAMS) return rawValue / 10;
+  if (measurement.unit === Esn00Unit.OZ) return (rawValue / 100) * OZ_TO_G;
   return null;
 }
 
