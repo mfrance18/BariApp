@@ -23,6 +23,7 @@ import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } fr
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
 import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
+import { getDailyActivity, hasHealthConnectAccess } from '../../src/services/healthConnect/adapter';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { formatDisplayDate, formatTimeOfDay, toLogDateKey } from '../../src/utils/date';
@@ -85,6 +86,12 @@ export default function DashboardScreen() {
   const { data: fluidEntries } = useQuery({
     queryKey: ['fluidLog', logDate],
     queryFn: () => listFluidEntriesForDate(logDate),
+  });
+  const { data: healthAccess } = useQuery({ queryKey: ['healthConnectAccess'], queryFn: hasHealthConnectAccess });
+  const { data: activity } = useQuery({
+    queryKey: ['dailyActivity', logDate],
+    queryFn: () => getDailyActivity(logDate),
+    enabled: !!healthAccess,
   });
 
   const { data: medsChecklist } = useQuery({
@@ -184,10 +191,10 @@ export default function DashboardScreen() {
                   <Text style={styles.ringLabel}>oz today</Text>
                 </ProgressRing>
 
-                <View style={styles.fluidStatsRow}>
-                  <FluidStat label="Goal" value={Math.round(mlToOz(fluidGoalMl))} />
-                  <FluidStat label="Logged" value={Math.round(mlToOz(fluidTotalMl))} highlight />
-                  <FluidStat
+                <View style={styles.statChipsRow}>
+                  <StatChip label="Goal" value={Math.round(mlToOz(fluidGoalMl))} />
+                  <StatChip label="Logged" value={Math.round(mlToOz(fluidTotalMl))} highlight />
+                  <StatChip
                     label="Remaining"
                     value={Math.max(0, Math.round(mlToOz(fluidGoalMl) - mlToOz(fluidTotalMl)))}
                   />
@@ -212,6 +219,18 @@ export default function DashboardScreen() {
                   </>
                 ) : (
                   <Text style={styles.statCardLabel}>Tap to log your weight</Text>
+                )}
+
+                {healthAccess && activity && (activity.steps != null || activity.caloriesBurned != null) && (
+                  <View style={styles.statChipsRow}>
+                    {activity.steps != null && <StatChip label="Steps" value={activity.steps} />}
+                    {activity.caloriesBurned != null && (
+                      <StatChip
+                        label={activity.caloriesSource === 'total' ? 'Cal Burned (total)' : 'Cal Burned'}
+                        value={Math.round(activity.caloriesBurned)}
+                      />
+                    )}
+                  </View>
                 )}
               </Card>
             </TouchableOpacity>
@@ -286,11 +305,11 @@ function RingStat({ label, value, highlight }: { label: string; value: number; h
   );
 }
 
-function FluidStat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+function StatChip({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <View style={styles.fluidStat}>
-      <Text style={[styles.fluidStatValue, highlight && styles.fluidStatValueHighlight]}>{value}</Text>
-      <Text style={styles.fluidStatLabel}>{label}</Text>
+    <View style={styles.statChip}>
+      <Text style={[styles.statChipValue, highlight && styles.statChipValueHighlight]}>{value}</Text>
+      <Text style={styles.statChipLabel}>{label}</Text>
     </View>
   );
 }
@@ -536,13 +555,13 @@ const styles = StyleSheet.create({
   fluidCard: {
     alignItems: 'center',
   },
-  fluidStatsRow: {
+  statChipsRow: {
     flexDirection: 'row',
     alignSelf: 'stretch',
     gap: spacing.sm,
     marginTop: spacing.lg,
   },
-  fluidStat: {
+  statChip: {
     flex: 1,
     alignItems: 'center',
     gap: 2,
@@ -552,15 +571,15 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
   },
-  fluidStatValue: {
+  statChipValue: {
     fontSize: 17,
     fontWeight: '700',
     color: colors.textPrimary,
   },
-  fluidStatValueHighlight: {
+  statChipValueHighlight: {
     color: colors.fluid,
   },
-  fluidStatLabel: {
+  statChipLabel: {
     ...typography.caption,
   },
   dotsRow: {

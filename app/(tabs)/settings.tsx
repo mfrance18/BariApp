@@ -1,13 +1,18 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
 import { getSettings, updateSettings } from '../../src/db/repositories/settingsRepo';
 import { getPairedScale, pairScale, unpairScale } from '../../src/services/bleScale/adapter';
+import {
+  hasHealthConnectAccess,
+  openHealthConnectManagement,
+  requestHealthConnectAccess,
+} from '../../src/services/healthConnect/adapter';
 import {
   ACCENT_PRESETS,
   BASE_PRESETS,
@@ -115,6 +120,19 @@ export default function SettingsScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['pairedScale'] }),
   });
 
+  const healthAccessQuery = useQuery({ queryKey: ['healthConnectAccess'], queryFn: hasHealthConnectAccess });
+
+  const connectHealthMutation = useMutation({
+    mutationFn: requestHealthConnectAccess,
+    onSuccess: (result) => {
+      if (result.ok) {
+        queryClient.invalidateQueries({ queryKey: ['healthConnectAccess'] });
+      } else {
+        Alert.alert('Could not connect', result.error);
+      }
+    },
+  });
+
   const goalsValid =
     Number(caloriesInput) > 0 && Number(proteinInput) > 0 && Number(fluidOzInput) > 0;
   const goalsDirty =
@@ -173,6 +191,23 @@ export default function SettingsScreen() {
           />
         )}
       </Section>
+      {Platform.OS === 'android' && (
+        <Section title="Health Data">
+          <Text style={styles.rowText}>
+            {healthAccessQuery.data ? 'Connected — steps & calories burned show on the Diary' : 'Not connected'}
+          </Text>
+          {healthAccessQuery.data ? (
+            <AppButton title="Manage in Health Connect" variant="secondary" onPress={openHealthConnectManagement} />
+          ) : (
+            <AppButton
+              title={connectHealthMutation.isPending ? 'Connecting…' : 'Connect Health Data'}
+              variant="secondary"
+              onPress={() => connectHealthMutation.mutate()}
+              disabled={connectHealthMutation.isPending}
+            />
+          )}
+        </Section>
+      )}
       <Section title="Theme">
         <SwatchPicker
           names={Object.keys(BASE_LABELS) as BaseThemeName[]}
