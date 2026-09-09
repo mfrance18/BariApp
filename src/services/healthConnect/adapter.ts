@@ -98,10 +98,19 @@ export interface DailyActivity {
   caloriesBurned: number | null;
   /** Active-calories reads are known to sometimes come back empty even with real data (community-reported library issue); falls back to total calories burned (includes resting metabolism) when that happens. */
   caloriesSource: 'active' | 'total' | null;
+  /**
+   * App package names that contributed to the steps total (e.g. Samsung
+   * Health, a paired watch app, Google Fit if also installed). Health
+   * Connect sums every contributing source without deduplicating overlap
+   * between them, so more than one entry here is the most likely cause of
+   * a steps total that doesn't match a single source app. Temporary
+   * diagnostic — surfaced in the UI until the real cause is confirmed.
+   */
+  stepsDataOrigins: string[];
 }
 
 export async function getDailyActivity(dateKey: string): Promise<DailyActivity> {
-  const empty: DailyActivity = { steps: null, caloriesBurned: null, caloriesSource: null };
+  const empty: DailyActivity = { steps: null, caloriesBurned: null, caloriesSource: null, stepsDataOrigins: [] };
   try {
     if (!(await ensureInitialized())) return empty;
     const timeRangeFilter = { operator: 'between' as const, ...dayRange(dateKey) };
@@ -112,19 +121,20 @@ export async function getDailyActivity(dateKey: string): Promise<DailyActivity> 
     ]);
 
     const steps = stepsResult?.COUNT_TOTAL ?? null;
+    const stepsDataOrigins = stepsResult?.dataOrigins ?? [];
     const activeCalories = activeResult?.ACTIVE_CALORIES_TOTAL?.inKilocalories ?? null;
 
     if (activeCalories != null && activeCalories > 0) {
-      return { steps, caloriesBurned: activeCalories, caloriesSource: 'active' };
+      return { steps, caloriesBurned: activeCalories, caloriesSource: 'active', stepsDataOrigins };
     }
 
     const totalResult = await aggregateRecord({ recordType: 'TotalCaloriesBurned', timeRangeFilter }).catch(() => null);
     const totalCalories = totalResult?.ENERGY_TOTAL?.inKilocalories ?? null;
     if (totalCalories != null && totalCalories > 0) {
-      return { steps, caloriesBurned: totalCalories, caloriesSource: 'total' };
+      return { steps, caloriesBurned: totalCalories, caloriesSource: 'total', stepsDataOrigins };
     }
 
-    return { steps, caloriesBurned: null, caloriesSource: null };
+    return { steps, caloriesBurned: null, caloriesSource: null, stepsDataOrigins };
   } catch {
     return empty;
   }
