@@ -137,7 +137,7 @@ export default function DashboardScreen() {
           >
             <View style={styles.carouselPage}>
               <Card style={styles.carouselCard}>
-                <View style={styles.calorieCard}>
+                <View style={styles.ringCardRow}>
                   <ProgressRing
                     size={148}
                     strokeWidth={14}
@@ -151,10 +151,10 @@ export default function DashboardScreen() {
                     <Text style={styles.ringLabel}>{overGoal ? 'kcal over' : 'kcal left'}</Text>
                   </ProgressRing>
 
-                  <View style={styles.calorieStatsColumn}>
-                    <CalorieStat label="Goal" value={Math.round(calorieGoal)} />
-                    <CalorieStat label="Food" value={Math.round(dailyTotals.calories)} />
-                    <CalorieStat label="Remaining" value={caloriesRemaining} highlight={overGoal} />
+                  <View style={styles.ringStatsColumn}>
+                    <RingStat label="Goal" value={Math.round(calorieGoal)} />
+                    <RingStat label="Food" value={Math.round(dailyTotals.calories)} />
+                    <RingStat label="Remaining" value={caloriesRemaining} highlight={overGoal} />
                   </View>
                 </View>
 
@@ -179,13 +179,20 @@ export default function DashboardScreen() {
 
             <TouchableOpacity style={styles.carouselPage} onPress={() => router.push('/fluids')} activeOpacity={0.8}>
               <Card style={styles.carouselCard}>
-                <Ionicons name="water" size={20} color={colors.fluid} />
-                <Text style={styles.statCardValue}>
-                  {mlToOz(fluidTotalMl).toFixed(0)} <Text style={styles.statCardUnit}>oz</Text>
-                </Text>
-                <Text style={styles.statCardLabel}>of {mlToOz(fluidGoalMl).toFixed(0)} oz goal</Text>
-                <View style={styles.statCardProgressTrack}>
-                  <View style={[styles.statCardProgressFill, { width: `${fluidProgress * 100}%` }]} />
+                <View style={styles.ringCardRow}>
+                  <ProgressRing size={148} strokeWidth={14} progress={fluidProgress} color={colors.fluid} trackColor={colors.border}>
+                    <Text style={styles.ringValue}>{Math.round(mlToOz(fluidTotalMl))}</Text>
+                    <Text style={styles.ringLabel}>oz today</Text>
+                  </ProgressRing>
+
+                  <View style={styles.ringStatsColumn}>
+                    <RingStat label="Goal" value={Math.round(mlToOz(fluidGoalMl))} />
+                    <RingStat label="Logged" value={Math.round(mlToOz(fluidTotalMl))} />
+                    <RingStat
+                      label="Remaining"
+                      value={Math.max(0, Math.round(mlToOz(fluidGoalMl) - mlToOz(fluidTotalMl)))}
+                    />
+                  </View>
                 </View>
               </Card>
             </TouchableOpacity>
@@ -272,11 +279,11 @@ export default function DashboardScreen() {
   );
 }
 
-function CalorieStat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+function RingStat({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
-    <View style={styles.calorieStatRow}>
-      <Text style={styles.calorieStatLabel}>{label}</Text>
-      <Text style={[styles.calorieStatValue, highlight && styles.ringValueDanger]}>{value}</Text>
+    <View style={styles.ringStatRow}>
+      <Text style={styles.ringStatLabel}>{label}</Text>
+      <Text style={[styles.ringStatValue, highlight && styles.ringValueDanger]}>{value}</Text>
     </View>
   );
 }
@@ -419,7 +426,7 @@ const styles = StyleSheet.create({
   dateHeading: {
     ...typography.heading,
   },
-  calorieCard: {
+  ringCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'stretch',
@@ -437,21 +444,21 @@ const styles = StyleSheet.create({
     ...typography.caption,
     marginTop: 2,
   },
-  calorieStatsColumn: {
+  ringStatsColumn: {
     flex: 1,
     gap: spacing.sm,
   },
-  calorieStatRow: {
+  ringStatRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.border,
     paddingBottom: spacing.sm,
   },
-  calorieStatLabel: {
+  ringStatLabel: {
     ...typography.caption,
   },
-  calorieStatValue: {
+  ringStatValue: {
     fontSize: 15,
     fontWeight: '700',
     color: colors.textPrimary,
@@ -545,18 +552,6 @@ const styles = StyleSheet.create({
   },
   statCardLabel: {
     ...typography.caption,
-  },
-  statCardProgressTrack: {
-    alignSelf: 'stretch',
-    height: 6,
-    borderRadius: radius.pill,
-    backgroundColor: colors.border,
-    overflow: 'hidden',
-    marginTop: 2,
-  },
-  statCardProgressFill: {
-    height: '100%',
-    backgroundColor: colors.fluid,
   },
   mealsHeading: {
     ...typography.label,
