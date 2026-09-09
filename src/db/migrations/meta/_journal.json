@@ -71,6 +71,13 @@
       "when": 1788920000000,
       "tag": "0009_ble_scale_pairing",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1788930000000,
+      "tag": "0010_ble_scale_device_name_fix",
+      "breakpoints": true
     }
   ]
 }
