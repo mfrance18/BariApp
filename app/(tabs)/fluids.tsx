@@ -48,6 +48,14 @@ function formatOz(oz: number): string {
   return Number.isInteger(oz) ? String(oz) : oz.toFixed(1);
 }
 
+function confirmDeleteFluidEntry(entry: FluidLogEntry, onConfirm: () => void) {
+  const amountLabel = `${formatOz(mlToOz(entry.amountMl))} oz${entry.sourceLabel ? ` · ${entry.sourceLabel}` : ''}`;
+  Alert.alert('Delete Entry?', `Delete ${amountLabel}? This can't be undone.`, [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Delete', style: 'destructive', onPress: onConfirm },
+  ]);
+}
+
 type FluidModalState = { mode: 'add'; amountOz: number | null } | { mode: 'edit'; entry: FluidLogEntry };
 
 export default function FluidsScreen() {
@@ -148,7 +156,7 @@ export default function FluidsScreen() {
         <FluidRow
           entry={item}
           onPress={() => setModalState({ mode: 'edit', entry: item })}
-          onDelete={() => deleteMutation.mutate(item.id)}
+          onDelete={() => confirmDeleteFluidEntry(item, () => deleteMutation.mutate(item.id))}
         />
       )}
       ListEmptyComponent={
@@ -299,7 +307,7 @@ function FluidModal({
                 title="Delete"
                 variant="danger"
                 style={styles.flexButton}
-                onPress={() => onDelete(state.entry.id)}
+                onPress={() => confirmDeleteFluidEntry(state.entry, () => onDelete(state.entry.id))}
               />
               <AppButton title="Cancel" variant="secondary" style={styles.flexButton} onPress={onClose} />
             </View>
