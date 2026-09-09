@@ -80,6 +80,7 @@ export default function DashboardScreen() {
   const grouped = groupEntriesByMeal(entries ?? []);
   const fluidTotalMl = (fluidEntries ?? []).reduce((sum, e) => sum + e.amountMl, 0);
   const fluidGoalMl = settings?.dailyFluidGoalMl ?? 1500;
+  const fluidProgress = fluidGoalMl > 0 ? Math.min(1, fluidTotalMl / fluidGoalMl) : 0;
   const dailyTotals = sumEntries(entries ?? []);
 
   const calorieGoal = settings?.dailyCalorieGoal ?? 0;
@@ -153,6 +154,9 @@ export default function DashboardScreen() {
                   {mlToOz(fluidTotalMl).toFixed(0)} <Text style={styles.statCardUnit}>oz</Text>
                 </Text>
                 <Text style={styles.statCardLabel}>of {mlToOz(fluidGoalMl).toFixed(0)} oz goal</Text>
+                <View style={styles.statCardProgressTrack}>
+                  <View style={[styles.statCardProgressFill, { width: `${fluidProgress * 100}%` }]} />
+                </View>
               </Card>
             </TouchableOpacity>
 
@@ -489,6 +493,18 @@ const styles = StyleSheet.create({
   },
   statCardLabel: {
     ...typography.caption,
+  },
+  statCardProgressTrack: {
+    alignSelf: 'stretch',
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.border,
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  statCardProgressFill: {
+    height: '100%',
+    backgroundColor: colors.fluid,
   },
   mealsHeading: {
     ...typography.label,
