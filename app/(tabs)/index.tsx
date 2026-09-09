@@ -538,13 +538,19 @@ const styles = StyleSheet.create({
   },
   fluidStatsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignSelf: 'stretch',
-    marginTop: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.lg,
   },
   fluidStat: {
+    flex: 1,
     alignItems: 'center',
     gap: 2,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.background,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
   },
   fluidStatValue: {
     fontSize: 17,
