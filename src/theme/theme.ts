@@ -1,7 +1,49 @@
+import { sqliteDb } from '../db/client';
+
+export type AccentName = 'blue' | 'purple' | 'red' | 'green';
+
+/** Accent color presets a user can pick between in Settings. */
+export const ACCENT_PRESETS: Record<AccentName, { primary: string; primaryDark: string; primaryLight: string }> = {
+  blue: { primary: '#3D9BFF', primaryDark: '#1C5FC7', primaryLight: '#1B3A5C' },
+  purple: { primary: '#A374FF', primaryDark: '#6B3FD1', primaryLight: '#332457' },
+  red: { primary: '#FF6B6B', primaryDark: '#D13F3F', primaryLight: '#4A2323' },
+  green: { primary: '#3ED598', primaryDark: '#1FA06D', primaryLight: '#12402F' },
+};
+
+/**
+ * Reads the saved accent preference synchronously, straight from SQLite,
+ * so it's available before this module's StyleSheet.create() calls (and
+ * every screen's, since they all import `colors` from here) run at import
+ * time — well before the async migration/query hooks in app/_layout.tsx
+ * complete. Changing the accent in Settings persists the new value then
+ * calls Updates.reloadAsync() to re-run the whole JS bundle, which is what
+ * actually applies it (React re-renders alone can't, since StyleSheet.create
+ * objects are computed once at module load, not per-render).
+ * Falls back to 'blue' if the column/table doesn't exist yet (very first
+ * launch after this feature shipped, before migrations have run) or any
+ * other read error.
+ */
+function readSavedAccent(): AccentName {
+  try {
+    const row = sqliteDb.getFirstSync<{ theme_accent: string }>(
+      'SELECT theme_accent FROM app_settings WHERE id = 1',
+    );
+    const value = row?.theme_accent;
+    if (value === 'blue' || value === 'purple' || value === 'red' || value === 'green') {
+      return value;
+    }
+    return 'blue';
+  } catch {
+    return 'blue';
+  }
+}
+
+const accent = ACCENT_PRESETS[readSavedAccent()];
+
 export const colors = {
-  primary: '#3D9BFF',
-  primaryDark: '#1C5FC7',
-  primaryLight: '#1B3A5C',
+  primary: accent.primary,
+  primaryDark: accent.primaryDark,
+  primaryLight: accent.primaryLight,
 
   background: '#0A1929',
   card: '#122840',
@@ -25,7 +67,7 @@ export const colors = {
   sodium: '#A78CFF',
   fluid: '#3FC1F0',
   fluidLight: '#123650',
-  weight: '#3D9BFF',
+  weight: accent.primary,
 };
 
 export const spacing = {

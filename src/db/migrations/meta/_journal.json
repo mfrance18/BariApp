@@ -50,6 +50,13 @@
       "when": 1788841000000,
       "tag": "0006_vitamins_meds_barcode",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788900000000,
+      "tag": "0007_theme_accent",
+      "breakpoints": true
     }
   ]
 }

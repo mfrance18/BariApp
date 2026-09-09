@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../src/components/ui/AppButton';
@@ -9,13 +9,20 @@ import { Card } from '../../src/components/ui/Card';
 import { SegmentedControl } from '../../src/components/ui/SegmentedControl';
 import { getSettings, updateSettings, type AppSettings } from '../../src/db/repositories/settingsRepo';
 import { login, logout, syncWeightHistoryToDb } from '../../src/services/vesync/adapter';
-import { colors, radius, spacing, typography } from '../../src/theme/theme';
+import { ACCENT_PRESETS, colors, radius, spacing, typography, type AccentName } from '../../src/theme/theme';
 import { mlToOz, ozToMl } from '../../src/utils/units';
 
 const WEIGHT_UNIT_OPTIONS: { label: string; value: AppSettings['weightUnit'] }[] = [
   { label: 'lb', value: 'lb' },
   { label: 'kg', value: 'kg' },
 ];
+
+const ACCENT_LABELS: Record<AccentName, string> = {
+  blue: 'Blue',
+  purple: 'Purple',
+  red: 'Red',
+  green: 'Green',
+};
 
 export default function SettingsScreen() {
   const queryClient = useQueryClient();
@@ -76,6 +83,27 @@ export default function SettingsScreen() {
   const weightUnitMutation = useMutation({
     mutationFn: (unit: AppSettings['weightUnit']) => updateSettings({ weightUnit: unit }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['app_settings'] }),
+  });
+
+  // Colors are computed once at module load (theme.ts reads them synchronously
+  // from SQLite), not per-render, so a plain re-render can't pick up a new
+  // accent — reloading the whole JS bundle is what actually applies it.
+  const themeMutation = useMutation({
+    mutationFn: async (accent: AccentName) => {
+      await updateSettings({ themeAccent: accent });
+      const Updates = await import('expo-updates');
+      if (!Updates.isEnabled) {
+        throw new Error('MANUAL_RESTART');
+      }
+      await Updates.reloadAsync();
+    },
+    onError: (error: Error) => {
+      if (error.message === 'MANUAL_RESTART') {
+        Alert.alert('Theme saved', 'Fully close and reopen the app to see the new theme.');
+      } else {
+        Alert.alert('Could not switch theme', error.message);
+      }
+    },
   });
 
   const goalsValid =
@@ -198,6 +226,33 @@ export default function SettingsScreen() {
           value={settings.weightUnit}
           onChange={(unit) => weightUnitMutation.mutate(unit)}
         />
+      </Section>
+      <Section title="Theme">
+        <View style={styles.swatchRow}>
+          {(Object.keys(ACCENT_PRESETS) as AccentName[]).map((accent) => {
+            const selected = settings.themeAccent === accent;
+            return (
+              <TouchableOpacity
+                key={accent}
+                style={styles.swatchButton}
+                onPress={() => themeMutation.mutate(accent)}
+                disabled={themeMutation.isPending}
+              >
+                <View
+                  style={[
+                    styles.swatchCircle,
+                    { backgroundColor: ACCENT_PRESETS[accent].primary },
+                    selected && styles.swatchCircleSelected,
+                  ]}
+                >
+                  {selected && <Ionicons name="checkmark" size={18} color="#fff" />}
+                </View>
+                <Text style={styles.swatchLabel}>{ACCENT_LABELS[accent]}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        {themeMutation.isPending && <Text style={styles.helperText}>Applying theme…</Text>}
       </Section>
     </KeyboardAwareScrollView>
   );
@@ -326,5 +381,29 @@ const styles = StyleSheet.create({
   errorText: {
     color: colors.danger,
     fontSize: 13,
+  },
+  swatchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  swatchButton: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  swatchCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  swatchCircleSelected: {
+    borderColor: colors.textPrimary,
+  },
+  swatchLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
   },
 });

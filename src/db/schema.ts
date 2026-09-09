@@ -190,5 +190,8 @@ export const appSettings = sqliteTable('app_settings', {
   weightUnit: text('weight_unit', { enum: ['lb', 'kg'] })
     .notNull()
     .default('lb'),
+  themeAccent: text('theme_accent', { enum: ['blue', 'purple', 'red', 'green'] })
+    .notNull()
+    .default('blue'),
   ...timestamps,
 });
