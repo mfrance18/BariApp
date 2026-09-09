@@ -8,7 +8,6 @@ import { Card } from '../src/components/ui/Card';
 import { KeyboardAvoidingScreen } from '../src/components/ui/KeyboardAvoidingScreen';
 import { getSettings } from '../src/db/repositories/settingsRepo';
 import { addManualWeight, listWeightLog, type WeightLogEntry } from '../src/db/repositories/weightRepo';
-import { syncWeightHistoryToDb } from '../src/services/vesync/adapter';
 import { colors, radius, spacing } from '../src/theme/theme';
 
 const KG_TO_LB = 2.20462;
@@ -19,11 +18,6 @@ export default function WeightHistoryScreen() {
 
   const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
   const { data: entries } = useQuery({ queryKey: ['weightLog'], queryFn: () => listWeightLog() });
-
-  const syncMutation = useMutation({
-    mutationFn: () => syncWeightHistoryToDb(30),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['weightLog'] }),
-  });
 
   const addManualMutation = useMutation({
     mutationFn: (weightKg: number) => addManualWeight(weightKg),
@@ -91,15 +85,6 @@ export default function WeightHistoryScreen() {
               />
               <AppButton title="Add" onPress={handleAddManual} disabled={addManualMutation.isPending} />
             </View>
-
-            {settings?.vesyncConnected && (
-              <AppButton
-                title={syncMutation.isPending ? 'Syncing…' : 'Sync from VeSync Scale'}
-                variant="secondary"
-                onPress={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-              />
-            )}
           </Card>
         </View>
       }
