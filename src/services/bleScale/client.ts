@@ -1,7 +1,9 @@
 import { PermissionsAndroid, Platform } from 'react-native';
-import { BleManager, type Device, type Subscription } from 'react-native-ble-plx';
+import { BleManager } from 'react-native-ble-plx';
 
-import { decodeWeightNotification, ESN00_NOTIFY_CHARACTERISTIC_UUID, ESN00_SERVICE_UUID } from './protocol';
+import { decodeWeightUpdate, ESN00_NOTIFY_CHARACTERISTIC_UUID, ESN00_SERVICE_UUID } from './protocol';
+
+const CONNECT_TIMEOUT_MS = 10_000;
 
 let manager: BleManager | null = null;
 function getManager(): BleManager {
@@ -65,51 +67,52 @@ export async function scanForScale(timeoutMs: number): Promise<ScannedScale | nu
   });
 }
 
+export interface ScaleWeightSubscription {
+  unsubscribe: () => void;
+}
+
 /**
- * Connects to a previously paired scale by id, waits for a settled weight
- * reading, then disconnects. Resolves null on any failure (permission
- * denied, connection failure, timeout with no settled reading) rather than
- * throwing, so callers can always fall back to manual entry.
+ * Connects to a previously paired scale by id and keeps the connection open,
+ * calling onReading for every weight update (settling or settled) until
+ * unsubscribed — this is what makes readings "live" instead of one-shot.
+ * Resolves null if permission is denied or the initial connection fails, so
+ * callers can always fall back to manual entry.
  */
-export async function readWeightGrams(deviceId: string, timeoutMs: number): Promise<number | null> {
+export async function subscribeToScaleWeight(
+  deviceId: string,
+  onReading: (grams: number, settled: boolean) => void,
+  onDisconnected: (error: string | null) => void,
+): Promise<ScaleWeightSubscription | null> {
   const hasPermission = await ensureBlePermissions();
   if (!hasPermission) return null;
 
   const bleManager = getManager();
-  let device: Device;
   try {
-    device = await bleManager.connectToDevice(deviceId, { timeout: timeoutMs });
+    const device = await bleManager.connectToDevice(deviceId, { timeout: CONNECT_TIMEOUT_MS });
     await device.discoverAllServicesAndCharacteristics();
-  } catch {
-    return null;
-  }
 
-  return new Promise((resolve) => {
-    let finished = false;
-    let subscription: Subscription | null = null;
+    const disconnectSubscription = device.onDisconnected((error) => {
+      onDisconnected(error?.message ?? null);
+    });
 
-    const finish = (grams: number | null) => {
-      if (finished) return;
-      finished = true;
-      subscription?.remove();
-      device.cancelConnection().catch(() => {});
-      resolve(grams);
-    };
-
-    const timer = setTimeout(() => finish(null), timeoutMs);
-
-    subscription = device.monitorCharacteristicForService(
+    const notifySubscription = device.monitorCharacteristicForService(
       ESN00_SERVICE_UUID,
       ESN00_NOTIFY_CHARACTERISTIC_UUID,
       (error, characteristic) => {
-        if (finished || error || !characteristic?.value) return;
-
-        const grams = decodeWeightNotification(characteristic.value);
-        if (grams != null) {
-          clearTimeout(timer);
-          finish(grams);
-        }
+        if (error || !characteristic?.value) return;
+        const update = decodeWeightUpdate(characteristic.value);
+        if (update) onReading(update.grams, update.settled);
       },
     );
-  });
+
+    return {
+      unsubscribe: () => {
+        disconnectSubscription.remove();
+        notifySubscription.remove();
+        device.cancelConnection().catch(() => {});
+      },
+    };
+  } catch {
+    return null;
+  }
 }

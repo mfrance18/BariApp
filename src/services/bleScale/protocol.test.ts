@@ -1,7 +1,7 @@
 import {
   base64ToBytes,
   decodeMeasurementPayload,
-  decodeWeightNotification,
+  decodeWeightUpdate,
   Esn00PacketType,
   Esn00Unit,
   measurementToGrams,
@@ -105,27 +105,32 @@ describe('base64ToBytes', () => {
   });
 });
 
-describe('decodeWeightNotification', () => {
+describe('decodeWeightUpdate', () => {
   it('decodes a settled grams reading end-to-end from a base64 notification value', () => {
     const base64 = bytesToBase64(buildMeasurementFrame(SETTLED_235_5G));
-    expect(decodeWeightNotification(base64)).toBeCloseTo(235.5);
+    expect(decodeWeightUpdate(base64)).toEqual({ grams: 235.5, settled: true });
   });
 
-  it('returns null while the reading is still settling', () => {
+  it('still decodes a reading that has not settled yet, flagged as such', () => {
     const unsettled = [0x00, 0x09, 0x33, Esn00Unit.GRAMS, 0x00];
     const base64 = bytesToBase64(buildMeasurementFrame(unsettled));
-    expect(decodeWeightNotification(base64)).toBeNull();
+    expect(decodeWeightUpdate(base64)).toEqual({ grams: 235.5, settled: false });
   });
 
   it('returns null for a non-MEASUREMENT packet type', () => {
     const body = [0xd1, 1, 0x00];
     const bytes = [0xfe, 0xef, 0xc0, 0xa2, ...body, checksum(body)];
-    expect(decodeWeightNotification(bytesToBase64(bytes))).toBeNull();
+    expect(decodeWeightUpdate(bytesToBase64(bytes))).toBeNull();
   });
 
   it('returns null for a bad checksum', () => {
     const bytes = buildMeasurementFrame(SETTLED_235_5G);
     bytes[bytes.length - 1] ^= 0xff;
-    expect(decodeWeightNotification(bytesToBase64(bytes))).toBeNull();
+    expect(decodeWeightUpdate(bytesToBase64(bytes))).toBeNull();
+  });
+
+  it('returns null for an unsupported unit', () => {
+    const bytes = buildMeasurementFrame([0x00, 0x00, 0x64, Esn00Unit.ML, 0x01]);
+    expect(decodeWeightUpdate(bytesToBase64(bytes))).toBeNull();
   });
 });

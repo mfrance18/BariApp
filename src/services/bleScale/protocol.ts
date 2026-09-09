@@ -114,12 +114,24 @@ export function base64ToBytes(base64: string): number[] {
   return bytes;
 }
 
-/** Decodes a raw base64 BLE notification value into a grams reading, or null if it isn't a usable settled weight. */
-export function decodeWeightNotification(base64Value: string): number | null {
+export interface WeightUpdate {
+  grams: number;
+  settled: boolean;
+}
+
+/**
+ * Decodes a raw base64 BLE notification value into a live grams reading —
+ * settling or settled — or null if it isn't a usable weight notification.
+ * Used for continuous live-tracking; the caller decides what to do with an
+ * unsettled reading (e.g. show it as still-fluctuating).
+ */
+export function decodeWeightUpdate(base64Value: string): WeightUpdate | null {
   const bytes = base64ToBytes(base64Value);
   const frame = parseEsn00Frame(bytes);
   if (!frame || !frame.checksumValid || frame.type !== Esn00PacketType.MEASUREMENT) return null;
   const measurement = decodeMeasurementPayload(frame.payload);
-  if (!measurement || !measurement.settled) return null;
-  return measurementToGrams(measurement);
+  if (!measurement) return null;
+  const grams = measurementToGrams(measurement);
+  if (grams == null) return null;
+  return { grams, settled: measurement.settled };
 }

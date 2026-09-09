@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { createFood, getFoodByBarcode, listFoods, updateFood, type Food } from '../db/repositories/foodsRepo';
-import { getPairedScale, readWeightFromScale } from '../services/bleScale/adapter';
+import { useLiveScaleWeight } from '../hooks/useLiveScaleWeight';
+import { getPairedScale } from '../services/bleScale/adapter';
 import { getProductByBarcode } from '../services/openFoodFacts/client';
 import { mapOffProductToFood, type OffFoodInput } from '../services/openFoodFacts/mapper';
 import type { OffProduct } from '../services/openFoodFacts/types';
@@ -18,6 +19,7 @@ import { AppButton } from './ui/AppButton';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Card } from './ui/Card';
 import { OffFoodResults } from './OffFoodResults';
+import { ScaleStatusRow } from './ui/ScaleStatusRow';
 
 interface NutritionDraft {
   calories: string;
@@ -155,28 +157,29 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [nutritionDraft, setNutritionDraft] = useState<NutritionDraft>(EMPTY_NUTRITION_DRAFT);
   const [savingIngredient, setSavingIngredient] = useState(false);
   const [quantityError, setQuantityError] = useState<string | null>(null);
-  const [scaleError, setScaleError] = useState<string | null>(null);
+  // Paused as soon as the user edits either field by hand, so a live reading
+  // doesn't fight their typing; resumes once they clear the amount back to
+  // empty — an explicit "give me a new reading" signal.
+  const [liveTrackingPaused, setLiveTrackingPaused] = useState(false);
   const [resolvingIngredients, setResolvingIngredients] = useState(false);
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const nextTempIdRef = useRef(-1);
 
   const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
+  const liveScale = useLiveScaleWeight(!!pairedScaleQuery.data && !!pendingIngredient);
 
-  const pullFromScaleMutation = useMutation({
-    mutationFn: readWeightFromScale,
-    onSuccess: (result) => {
-      if (!result.ok) {
-        setScaleError(result.error);
-        return;
-      }
-      setScaleError(null);
-      const targetUnit = isWeighableUnit(quantityUnit.trim()) ? quantityUnit.trim() : 'oz';
-      const displayAmount = gramsToServing(result.weightG, targetUnit) ?? result.weightG;
-      setQuantityUnit(targetUnit);
-      setQuantityAmount(String(Math.round(displayAmount * 100) / 100));
-    },
-  });
+  // Applies each live reading to the popup automatically — this is what
+  // makes it "instant" instead of needing a Pull from Scale tap — unless
+  // tracking is paused. Keeps the current unit if it's already weighable,
+  // otherwise defaults to oz.
+  useEffect(() => {
+    if (!pendingIngredient || liveScale.grams == null || liveTrackingPaused) return;
+    const targetUnit = isWeighableUnit(quantityUnit.trim()) ? quantityUnit.trim() : 'oz';
+    const displayAmount = gramsToServing(liveScale.grams, targetUnit) ?? liveScale.grams;
+    setQuantityUnit(targetUnit);
+    setQuantityAmount(String(Math.round(displayAmount * 100) / 100));
+  }, [liveScale.grams, liveTrackingPaused, pendingIngredient, quantityUnit]);
 
   function setNutritionField<K extends keyof NutritionDraft>(key: K, value: string) {
     setNutritionDraft((prev) => ({ ...prev, [key]: value }));
@@ -228,7 +231,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     }
     setError(null);
     setQuantityError(null);
-    setScaleError(null);
+    setLiveTrackingPaused(false);
     let defaultAmount: number;
     let defaultUnit: string;
     if (isWeighableUnit(food.servingUnit)) {
@@ -619,7 +622,10 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
                 <TextInput
                   style={styles.input}
                   value={quantityAmount}
-                  onChangeText={setQuantityAmount}
+                  onChangeText={(v) => {
+                    setQuantityAmount(v);
+                    setLiveTrackingPaused(v.trim() !== '');
+                  }}
                   keyboardType="decimal-pad"
                   placeholder="12"
                   placeholderTextColor={colors.textMuted}
@@ -631,7 +637,10 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
                 <TextInput
                   style={styles.input}
                   value={quantityUnit}
-                  onChangeText={setQuantityUnit}
+                  onChangeText={(v) => {
+                    setQuantityUnit(v);
+                    setLiveTrackingPaused(true);
+                  }}
                   placeholder="g, oz, ml, lb…"
                   placeholderTextColor={colors.textMuted}
                   autoCapitalize="none"
@@ -640,17 +649,8 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
             </View>
 
             {pairedScaleQuery.data && (
-              <AppButton
-                title={pullFromScaleMutation.isPending ? 'Reading…' : 'Pull from Scale'}
-                variant="secondary"
-                onPress={() => {
-                  setScaleError(null);
-                  pullFromScaleMutation.mutate();
-                }}
-                disabled={pullFromScaleMutation.isPending}
-              />
+              <ScaleStatusRow scale={liveScale} paused={liveTrackingPaused} onReconnect={liveScale.reconnect} />
             )}
-            {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
 
             <Text style={styles.sectionLabel}>
               NUTRITION (FOR {quantityAmount || pendingIngredient?.servingAmount} {quantityUnit || pendingIngredient?.servingUnit})

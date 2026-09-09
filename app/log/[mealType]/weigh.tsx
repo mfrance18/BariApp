@@ -6,11 +6,13 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { Card } from '../../../src/components/ui/Card';
+import { ScaleStatusRow } from '../../../src/components/ui/ScaleStatusRow';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
 import { getFoodById } from '../../../src/db/repositories/foodsRepo';
 import { createEntry, getEntryById, updateEntry, type NewMealLogEntry } from '../../../src/db/repositories/mealLogRepo';
 import { getRecipeWithIngredients } from '../../../src/db/repositories/recipesRepo';
-import { getPairedScale, readWeightFromScale } from '../../../src/services/bleScale/adapter';
+import { useLiveScaleWeight } from '../../../src/hooks/useLiveScaleWeight';
+import { getPairedScale } from '../../../src/services/bleScale/adapter';
 import {
   computeRecipeTotals,
   getReferenceWeightG,
@@ -56,7 +58,10 @@ export default function WeighScreen() {
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('oz');
   const [servingsInput, setServingsInput] = useState('1');
   const [weightSource, setWeightSource] = useState<'manual' | 'vesync_scale' | 'ble_scale'>('manual');
-  const [scaleError, setScaleError] = useState<string | null>(null);
+  // Live scale readings stop overwriting the field once the user types into
+  // it (or it's pre-filled from an existing entry), and resume once they
+  // clear it back to empty — an explicit "give me a new reading" signal.
+  const [liveTrackingPaused, setLiveTrackingPaused] = useState(entryId != null);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
@@ -144,20 +149,18 @@ export default function WeighScreen() {
   }, [measuredAmount, isCountBased, itemType, foodQuery.data, recipeQuery.data]);
 
   const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
+  const liveScale = useLiveScaleWeight(!!pairedScaleQuery.data && !isCountBased);
 
-  const pullFromScaleMutation = useMutation({
-    mutationFn: readWeightFromScale,
-    onSuccess: (result) => {
-      if (!result.ok) {
-        setScaleError(result.error);
-        return;
-      }
-      setScaleError(null);
-      const displayAmount = gramsToServing(result.weightG, weightUnit) ?? result.weightG;
-      setWeightInput(String(Math.round(displayAmount * 100) / 100));
-      setWeightSource('ble_scale');
-    },
-  });
+  // Applies each live reading to the field automatically — this is what
+  // makes it "instant" instead of needing a Pull from Scale tap — unless
+  // tracking is paused (the user is editing, or this is a pre-filled
+  // existing entry they haven't cleared).
+  useEffect(() => {
+    if (liveScale.grams == null || liveTrackingPaused) return;
+    const displayAmount = gramsToServing(liveScale.grams, weightUnit) ?? liveScale.grams;
+    setWeightInput(String(Math.round(displayAmount * 100) / 100));
+    setWeightSource('ble_scale');
+  }, [liveScale.grams, weightUnit, liveTrackingPaused]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -247,6 +250,7 @@ export default function WeighScreen() {
               onChangeText={(v) => {
                 setWeightInput(v);
                 setWeightSource('manual');
+                setLiveTrackingPaused(v.trim() !== '');
               }}
               keyboardType="decimal-pad"
               placeholder={weightUnit === 'g' ? 'e.g. 120' : 'e.g. 4.2'}
@@ -271,18 +275,8 @@ export default function WeighScreen() {
             </View>
           </View>
           {pairedScaleQuery.data && (
-            <AppButton
-              title={pullFromScaleMutation.isPending ? 'Reading…' : 'Pull from Scale'}
-              variant="secondary"
-              onPress={() => {
-                setScaleError(null);
-                pullFromScaleMutation.mutate();
-              }}
-              disabled={pullFromScaleMutation.isPending}
-            />
+            <ScaleStatusRow scale={liveScale} paused={liveTrackingPaused} onReconnect={liveScale.reconnect} />
           )}
-          {scaleError && <Text style={styles.errorText}>{scaleError}</Text>}
-          {weightSource === 'ble_scale' && <Text style={styles.helperText}>Weight pulled from food scale</Text>}
           {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
         </Card>
       )}
