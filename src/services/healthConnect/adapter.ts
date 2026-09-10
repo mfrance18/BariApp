@@ -10,8 +10,6 @@ import {
   type Permission,
 } from 'react-native-health-connect';
 
-import { todayLogDateKey } from '../../utils/date';
-
 /**
  * Steps and calories burned, read from Android's Health Connect (Android
  * only — there is no equivalent on iOS in this app). Samsung Health and
@@ -86,10 +84,19 @@ export function openHealthConnectManagement(): void {
   openHealthConnectSettings();
 }
 
+/**
+ * Some sources (Samsung Health included) write a single record spanning the
+ * whole day rather than incremental per-interval records, with its running
+ * total as of whenever it last synced. Querying "midnight to right now"
+ * makes Health Connect's aggregate prorate that record's value down by how
+ * much of its own span falls inside the query window — undercounting steps
+ * badly for a day still in progress. Always querying the full calendar day
+ * avoids that: a record can't contain data for time that hasn't happened
+ * yet, so this can't accidentally include "future" steps either.
+ */
 function dayRange(dateKey: string): { startTime: string; endTime: string } {
   const startTime = new Date(`${dateKey}T00:00:00`).toISOString();
-  const endTime =
-    dateKey === todayLogDateKey() ? new Date().toISOString() : new Date(`${dateKey}T23:59:59.999`).toISOString();
+  const endTime = new Date(`${dateKey}T23:59:59.999`).toISOString();
   return { startTime, endTime };
 }
 
