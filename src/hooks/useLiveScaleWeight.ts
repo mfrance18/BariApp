@@ -6,12 +6,18 @@ export type LiveScaleStatus = 'idle' | 'connecting' | 'live' | 'error';
 
 export interface LiveScaleWeight {
   status: LiveScaleStatus;
-  /** Most recent reading in grams, kept across reconnects — null until the first reading arrives. */
+  /** Most recent reading in grams, net of any active tare — null until the first reading arrives. */
   grams: number | null;
   settled: boolean;
   error: string | null;
   /** Re-attempts the connection after a failure. No-op while already connecting/live. */
   reconnect: () => void;
+  /** Whether a tare (zero) is currently applied. */
+  isTared: boolean;
+  /** Zeroes the scale in software: the current raw reading becomes the new baseline, so a container's weight is subtracted from every reading after it. No-op until at least one reading has arrived. */
+  tare: () => void;
+  /** Clears an active tare, going back to showing the raw reading. */
+  clearTare: () => void;
 }
 
 /**
@@ -19,13 +25,23 @@ export interface LiveScaleWeight {
  * `enabled` is true, streaming weight readings as they arrive instead of
  * requiring a "Pull from Scale" tap each time. Automatically connects when
  * enabled flips true and disconnects on unmount or when enabled flips false.
+ *
+ * The ESN00 only notifies weight over BLE — there's no known write command
+ * to zero the scale in hardware — so taring is done in software here: it
+ * remembers the raw reading at the moment of taring and subtracts it from
+ * every reading after that, until cleared or a new connection starts.
  */
 export function useLiveScaleWeight(enabled: boolean): LiveScaleWeight {
   const [status, setStatus] = useState<LiveScaleStatus>('idle');
-  const [grams, setGrams] = useState<number | null>(null);
+  const [rawGrams, setRawGrams] = useState<number | null>(null);
   const [settled, setSettled] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [tareOffsetGrams, setTareOffsetGrams] = useState(0);
+
+  useEffect(() => {
+    setTareOffsetGrams(0);
+  }, [enabled, attempt]);
 
   useEffect(() => {
     if (!enabled) {
@@ -40,7 +56,7 @@ export function useLiveScaleWeight(enabled: boolean): LiveScaleWeight {
     const subscriptionPromise = streamWeightFromScale({
       onReading: (g, isSettled) => {
         if (cancelled) return;
-        setGrams(g);
+        setRawGrams(g);
         setSettled(isSettled);
         setStatus('live');
       },
@@ -67,5 +83,18 @@ export function useLiveScaleWeight(enabled: boolean): LiveScaleWeight {
     };
   }, [enabled, attempt]);
 
-  return { status, grams, settled, error, reconnect: () => setAttempt((n) => n + 1) };
+  const grams = rawGrams == null ? null : Math.max(0, rawGrams - tareOffsetGrams);
+
+  return {
+    status,
+    grams,
+    settled,
+    error,
+    reconnect: () => setAttempt((n) => n + 1),
+    isTared: tareOffsetGrams !== 0,
+    tare: () => {
+      if (rawGrams != null) setTareOffsetGrams(rawGrams);
+    },
+    clearTare: () => setTareOffsetGrams(0),
+  };
 }

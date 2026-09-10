@@ -36,7 +36,16 @@ export function ScaleStatusRow({
       : scale.settled
         ? 'Live weight from scale'
         : 'Reading… (settling)';
-    return <Text style={styles.helperText}>{text}</Text>;
+    return (
+      <View style={styles.liveRow}>
+        <Text style={styles.helperText}>{scale.isTared ? `${text} (zeroed)` : text}</Text>
+        <AppButton
+          title={scale.isTared ? 'Clear Zero' : 'Zero Scale'}
+          variant="text"
+          onPress={scale.isTared ? scale.clearTare : scale.tare}
+        />
+      </View>
+    );
   }
   return null;
 }
@@ -45,6 +54,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  liveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: spacing.sm,
   },
   errorText: {
