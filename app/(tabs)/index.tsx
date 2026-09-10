@@ -235,9 +235,6 @@ export default function DashboardScreen() {
                     )}
                   </View>
                 )}
-                {healthAccess && activity && activity.stepsDataOrigins.length > 0 && (
-                  <Text style={styles.debugText}>Steps sources: {activity.stepsDataOrigins.join(', ')}</Text>
-                )}
               </Card>
             </TouchableOpacity>
           </ScrollView>
@@ -601,12 +598,6 @@ const styles = StyleSheet.create({
   },
   statChipLabel: {
     ...typography.caption,
-  },
-  debugText: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
-    textAlign: 'center',
   },
   dotsRow: {
     flexDirection: 'row',
