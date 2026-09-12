@@ -149,7 +149,12 @@ export default function WeighScreen() {
   }, [measuredAmount, isCountBased, itemType, foodQuery.data, recipeQuery.data]);
 
   const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
-  const liveScale = useLiveScaleWeight(!!pairedScaleQuery.data && !isCountBased);
+  const scaleActive = !!pairedScaleQuery.data && !isCountBased;
+  const liveScale = useLiveScaleWeight(scaleActive);
+  // While the scale is actively driving the field, lock it so an accidental
+  // tap can't type over the live reading — "Enter Manually" is the explicit
+  // way out, same as clearing the field is the explicit way back in.
+  const weightFieldLocked = scaleActive && !liveTrackingPaused && liveScale.status !== 'error';
 
   // Applies each live reading to the field automatically — this is what
   // makes it "instant" instead of needing a Pull from Scale tap — unless
@@ -245,17 +250,18 @@ export default function WeighScreen() {
           <Text style={styles.fieldLabel}>Weight</Text>
           <View style={styles.weightRow}>
             <TextInput
-              style={[styles.input, styles.weightInput]}
+              style={[styles.input, styles.weightInput, weightFieldLocked && styles.inputLocked]}
               value={weightInput}
               onChangeText={(v) => {
                 setWeightInput(v);
                 setWeightSource('manual');
                 setLiveTrackingPaused(v.trim() !== '');
               }}
+              editable={!weightFieldLocked}
               keyboardType="decimal-pad"
               placeholder={weightUnit === 'g' ? 'e.g. 120' : 'e.g. 4.2'}
               placeholderTextColor={colors.textMuted}
-              autoFocus
+              autoFocus={!weightFieldLocked}
             />
             <View style={styles.unitPicker}>
               <SegmentedControl
@@ -276,6 +282,16 @@ export default function WeighScreen() {
           </View>
           {pairedScaleQuery.data && (
             <ScaleStatusRow scale={liveScale} paused={liveTrackingPaused} onReconnect={liveScale.reconnect} />
+          )}
+          {weightFieldLocked && (
+            <AppButton
+              title="Enter Manually"
+              variant="text"
+              onPress={() => {
+                setWeightSource('manual');
+                setLiveTrackingPaused(true);
+              }}
+            />
           )}
           {weightSource === 'vesync_scale' && <Text style={styles.helperText}>Weight pulled from VeSync scale</Text>}
         </Card>
@@ -364,6 +380,10 @@ const styles = StyleSheet.create({
   },
   weightInput: {
     flex: 1,
+  },
+  inputLocked: {
+    backgroundColor: colors.background,
+    color: colors.textMuted,
   },
   unitPicker: {
     width: 150,

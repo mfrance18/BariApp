@@ -167,7 +167,12 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const nextTempIdRef = useRef(-1);
 
   const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
-  const liveScale = useLiveScaleWeight(!!pairedScaleQuery.data && !!pendingIngredient);
+  const scaleActive = !!pairedScaleQuery.data && !!pendingIngredient;
+  const liveScale = useLiveScaleWeight(scaleActive);
+  // While the scale is actively driving the amount, lock it so an accidental
+  // tap can't type over the live reading — "Enter Manually" is the explicit
+  // way out, same as clearing the field is the explicit way back in.
+  const amountFieldLocked = scaleActive && !liveTrackingPaused && liveScale.status !== 'error';
 
   // Applies each live reading to the popup automatically — this is what
   // makes it "instant" instead of needing a Pull from Scale tap — unless
@@ -620,16 +625,17 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
               <View style={styles.servingAmountField}>
                 <Text style={styles.fieldLabel}>Amount</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, amountFieldLocked && styles.inputLocked]}
                   value={quantityAmount}
                   onChangeText={(v) => {
                     setQuantityAmount(v);
                     setLiveTrackingPaused(v.trim() !== '');
                   }}
+                  editable={!amountFieldLocked}
                   keyboardType="decimal-pad"
                   placeholder="12"
                   placeholderTextColor={colors.textMuted}
-                  autoFocus
+                  autoFocus={!amountFieldLocked}
                 />
               </View>
               <View style={styles.servingUnitField}>
@@ -650,6 +656,13 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
 
             {pairedScaleQuery.data && (
               <ScaleStatusRow scale={liveScale} paused={liveTrackingPaused} onReconnect={liveScale.reconnect} />
+            )}
+            {amountFieldLocked && (
+              <AppButton
+                title="Enter Manually"
+                variant="text"
+                onPress={() => setLiveTrackingPaused(true)}
+              />
             )}
 
             <Text style={styles.sectionLabel}>
@@ -782,6 +795,10 @@ const styles = StyleSheet.create({
   inputMultiline: {
     minHeight: 60,
     textAlignVertical: 'top',
+  },
+  inputLocked: {
+    backgroundColor: colors.background,
+    color: colors.textMuted,
   },
   sectionLabel: {
     ...typography.label,
