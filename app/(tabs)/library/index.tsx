@@ -134,6 +134,7 @@ export default function LibraryScreen() {
                 </View>
                 <View style={styles.rowTextGroup}>
                   <Text style={styles.rowTitle}>{item.name}</Text>
+                  {item.brand && <Text style={styles.rowBrand}>{item.brand}</Text>}
                   <Text style={styles.rowSubtitle}>
                     {item.calories} kcal / {item.servingAmount} {item.servingUnit}
                   </Text>
@@ -253,6 +254,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  rowBrand: {
+    fontSize: 11,
+    color: colors.textMuted,
   },
   rowSubtitle: {
     fontSize: 12,
