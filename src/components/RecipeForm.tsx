@@ -613,7 +613,10 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
       <View style={styles.quantityModalOverlay}>
         <KeyboardAwareScrollView
           style={styles.quantityModalScroll}
-          contentContainerStyle={StyleSheet.flatten(styles.quantityModalScrollContent)}
+          contentContainerStyle={StyleSheet.flatten([
+            styles.quantityModalScrollContent,
+            { paddingBottom: spacing.lg + insets.bottom },
+          ])}
           keyboardShouldPersistTaps="handled"
           enableOnAndroid
           extraScrollHeight={80}
