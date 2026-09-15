@@ -52,36 +52,36 @@ export default function MedsScreen() {
     ({ item, id, ...rest }: SortableRenderItemProps<SortableMedItem>) => (
       <SortableItem key={id} id={id} data={item} {...rest} onDrop={handleDrop}>
         <View style={styles.itemSlot}>
-          <View style={styles.row}>
-            <SortableItem.Handle>
-              <View style={styles.dragHandle} hitSlop={8}>
-                <Ionicons name="reorder-three-outline" size={22} color={colors.textMuted} />
-              </View>
-            </SortableItem.Handle>
-            <TouchableOpacity
-              style={styles.rowContent}
-              onPress={() => router.push(`/meds/${item.medId}/edit`)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowIcon}>
-                <Ionicons
-                  name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
-                  size={18}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.rowTextGroup}>
-                <Text style={styles.rowName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.rowMeta} numberOfLines={1}>
-                  {item.type === 'vitamin' ? 'Vitamin' : 'Medication'}
-                  {item.dosageLabel ? ` · ${item.dosageLabel}` : ''}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
-            </TouchableOpacity>
-          </View>
+          {/* No SortableItem.Handle here on purpose — the whole row is the
+              drag surface. The library's pan gesture only activates after a
+              ~200ms hold, so a quick tap still reaches this TouchableOpacity
+              and navigates normally; only a press-and-hold starts a drag. */}
+          <TouchableOpacity
+            style={styles.row}
+            onPress={() => router.push(`/meds/${item.medId}/edit`)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.dragHandle}>
+              <Ionicons name="reorder-three-outline" size={22} color={colors.textMuted} />
+            </View>
+            <View style={styles.rowIcon}>
+              <Ionicons
+                name={item.type === 'vitamin' ? 'nutrition-outline' : 'medkit-outline'}
+                size={18}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.rowTextGroup}>
+              <Text style={styles.rowName} numberOfLines={1}>
+                {item.name}
+              </Text>
+              <Text style={styles.rowMeta} numberOfLines={1}>
+                {item.type === 'vitamin' ? 'Vitamin' : 'Medication'}
+                {item.dosageLabel ? ` · ${item.dosageLabel}` : ''}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
         </View>
       </SortableItem>
     ),
@@ -92,7 +92,7 @@ export default function MedsScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <AppButton title="+ Add Vitamin or Medication" onPress={() => router.push('/meds/new/edit')} />
-        {meds && meds.length > 1 && <Text style={styles.hint}>Hold the grip icon to drag and reorder.</Text>}
+        {meds && meds.length > 1 && <Text style={styles.hint}>Press and hold a row to drag and reorder.</Text>}
       </View>
       {meds && meds.length > 0 ? (
         <Sortable
@@ -143,12 +143,6 @@ const styles = StyleSheet.create({
   },
   dragHandle: {
     padding: spacing.xs,
-  },
-  rowContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
   },
   rowIcon: {
     width: 32,
