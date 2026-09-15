@@ -153,10 +153,9 @@ export async function getTodayChecklist(scheduledDate: string, today: Date = new
 
   return todaySchedules
     .slice()
-    // Primarily the vitamin/med's own drag-and-drop order (see
-    // reorderVitaminsMeds), with time of day only as a tiebreak for a
-    // single med with more than one reminder time.
-    .sort((a, b) => a.med.sortOrder - b.med.sortOrder || a.schedule.timeOfDay.localeCompare(b.schedule.timeOfDay))
+    // Primarily by time of day, with the vitamin/med's own drag-and-drop
+    // order (see reorderVitaminsMeds) as a tiebreak for same-time reminders.
+    .sort((a, b) => a.schedule.timeOfDay.localeCompare(b.schedule.timeOfDay) || a.med.sortOrder - b.med.sortOrder)
     .map((row) => {
       const log = logByScheduleId.get(row.schedule.id);
       return {
