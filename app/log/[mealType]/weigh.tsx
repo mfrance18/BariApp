@@ -62,6 +62,11 @@ export default function WeighScreen() {
   // it (or it's pre-filled from an existing entry), and resume once they
   // clear it back to empty — an explicit "give me a new reading" signal.
   const [liveTrackingPaused, setLiveTrackingPaused] = useState(entryId != null);
+  // Separate from liveTrackingPaused: whether we should even be searching
+  // for/connected to the scale at all. "Enter Manually" turns this off
+  // (actually disconnecting, not just ignoring readings) and becomes
+  // "Search for Scale" to turn it back on.
+  const [scaleSearchEnabled, setScaleSearchEnabled] = useState(true);
 
   const id = Number(itemId);
   const effectiveLogDate = logDate ?? todayLogDateKey();
@@ -150,11 +155,11 @@ export default function WeighScreen() {
 
   const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
   const scaleActive = !!pairedScaleQuery.data && !isCountBased;
-  const liveScale = useLiveScaleWeight(scaleActive);
+  const liveScale = useLiveScaleWeight(scaleActive && scaleSearchEnabled);
   // While the scale is actively driving the field, lock it so an accidental
   // tap can't type over the live reading — "Enter Manually" is the explicit
   // way out, same as clearing the field is the explicit way back in.
-  const weightFieldLocked = scaleActive && !liveTrackingPaused && liveScale.status !== 'error';
+  const weightFieldLocked = scaleActive && scaleSearchEnabled && !liveTrackingPaused && liveScale.status !== 'error';
 
   // Applies each live reading to the field automatically — this is what
   // makes it "instant" instead of needing a Pull from Scale tap — unless
@@ -283,13 +288,19 @@ export default function WeighScreen() {
           {pairedScaleQuery.data && (
             <ScaleStatusRow scale={liveScale} paused={liveTrackingPaused} onReconnect={liveScale.reconnect} />
           )}
-          {weightFieldLocked && (
+          {scaleActive && (
             <AppButton
-              title="Enter Manually"
+              title={scaleSearchEnabled ? 'Enter Manually' : 'Search for Scale'}
               variant="text"
               onPress={() => {
-                setWeightSource('manual');
-                setLiveTrackingPaused(true);
+                if (scaleSearchEnabled) {
+                  setWeightSource('manual');
+                  setLiveTrackingPaused(true);
+                  setScaleSearchEnabled(false);
+                } else {
+                  setLiveTrackingPaused(false);
+                  setScaleSearchEnabled(true);
+                }
               }}
             />
           )}

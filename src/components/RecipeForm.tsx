@@ -161,6 +161,11 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   // doesn't fight their typing; resumes once they clear the amount back to
   // empty — an explicit "give me a new reading" signal.
   const [liveTrackingPaused, setLiveTrackingPaused] = useState(false);
+  // Separate from liveTrackingPaused: whether we should even be searching
+  // for/connected to the scale at all. "Enter Manually" turns this off
+  // (actually disconnecting, not just ignoring readings) and becomes
+  // "Search for Scale" to turn it back on.
+  const [scaleSearchEnabled, setScaleSearchEnabled] = useState(true);
   const [resolvingIngredients, setResolvingIngredients] = useState(false);
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
@@ -168,11 +173,11 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
 
   const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
   const scaleActive = !!pairedScaleQuery.data && !!pendingIngredient;
-  const liveScale = useLiveScaleWeight(scaleActive);
+  const liveScale = useLiveScaleWeight(scaleActive && scaleSearchEnabled);
   // While the scale is actively driving the amount, lock it so an accidental
   // tap can't type over the live reading — "Enter Manually" is the explicit
   // way out, same as clearing the field is the explicit way back in.
-  const amountFieldLocked = scaleActive && !liveTrackingPaused && liveScale.status !== 'error';
+  const amountFieldLocked = scaleActive && scaleSearchEnabled && !liveTrackingPaused && liveScale.status !== 'error';
 
   // Applies each live reading to the popup automatically — this is what
   // makes it "instant" instead of needing a Pull from Scale tap — unless
@@ -237,16 +242,16 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     setError(null);
     setQuantityError(null);
     setLiveTrackingPaused(false);
-    let defaultAmount: number;
-    let defaultUnit: string;
-    if (isWeighableUnit(food.servingUnit)) {
-      defaultAmount = food.servingAmount;
-      defaultUnit = food.servingUnit;
-    } else {
-      defaultAmount = food.servingWeightG ?? 0;
-      defaultUnit = 'g';
-    }
-    setQuantityAmount(defaultAmount ? String(defaultAmount) : '');
+    setScaleSearchEnabled(true);
+    // Always default to oz for display, regardless of the food's own stored
+    // serving unit (often "g", e.g. OFF's per-100g imports) — same
+    // oz-by-default convention as the Food form's weight field.
+    const referenceGrams = isWeighableUnit(food.servingUnit)
+      ? (servingToGrams(food.servingAmount, food.servingUnit) ?? 0)
+      : (food.servingWeightG ?? 0);
+    const defaultUnit = 'oz';
+    const defaultAmount = referenceGrams > 0 ? (gramsToServing(referenceGrams, defaultUnit) ?? 0) : 0;
+    setQuantityAmount(defaultAmount ? String(Math.round(defaultAmount * 100) / 100) : '');
     setQuantityUnit(defaultUnit);
     setNutritionDraft(nutritionDraftForQuantity(food, defaultAmount, defaultUnit) ?? EMPTY_NUTRITION_DRAFT);
     setPendingIngredient(food);
@@ -660,11 +665,19 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
             {pairedScaleQuery.data && (
               <ScaleStatusRow scale={liveScale} paused={liveTrackingPaused} onReconnect={liveScale.reconnect} />
             )}
-            {amountFieldLocked && (
+            {scaleActive && (
               <AppButton
-                title="Enter Manually"
+                title={scaleSearchEnabled ? 'Enter Manually' : 'Search for Scale'}
                 variant="text"
-                onPress={() => setLiveTrackingPaused(true)}
+                onPress={() => {
+                  if (scaleSearchEnabled) {
+                    setLiveTrackingPaused(true);
+                    setScaleSearchEnabled(false);
+                  } else {
+                    setLiveTrackingPaused(false);
+                    setScaleSearchEnabled(true);
+                  }
+                }}
               />
             )}
 
