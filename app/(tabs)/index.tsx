@@ -24,6 +24,7 @@ import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
 import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
 import { getDailyActivity, hasHealthConnectAccess } from '../../src/services/healthConnect/adapter';
+import { dismissPresentedNotificationsForSchedule } from '../../src/services/notifications/scheduler';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { formatDisplayDate, formatTimeOfDay, toLogDateKey } from '../../src/utils/date';
@@ -101,8 +102,14 @@ export default function DashboardScreen() {
   });
 
   const toggleMedMutation = useMutation({
-    mutationFn: (item: TodayChecklistItem) =>
-      item.status === 'taken' ? clearStatus(item.scheduleId, logDate) : setStatus(item.scheduleId, logDate, 'taken'),
+    mutationFn: async (item: TodayChecklistItem) => {
+      if (item.status === 'taken') {
+        await clearStatus(item.scheduleId, logDate);
+      } else {
+        await setStatus(item.scheduleId, logDate, 'taken');
+        await dismissPresentedNotificationsForSchedule(item.scheduleId);
+      }
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['medsChecklist', logDate] }),
   });
 
