@@ -5,9 +5,49 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { roundNutritionForDisplay } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
-import { isWeighableUnit, servingToGrams } from '../utils/servingUnits';
+import { OZ_TO_G } from '../utils/units';
+import {
+  gramsToServing,
+  isWeighableUnit,
+  ozPerUsVolumeUnit,
+  parseServingAmount,
+  servingToGrams,
+} from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { Card } from './ui/Card';
+import { Dropdown, type DropdownOption } from './ui/Dropdown';
+
+const CUSTOM_UNIT = '__custom__';
+
+/** Popular US serving units — weighable ones first (auto-calculate a weight equivalent), then common discrete counts. "Other" reveals a free-text field for anything not listed (e.g. imported/legacy units). */
+const SERVING_UNIT_OPTIONS: DropdownOption<string>[] = [
+  { label: 'grams (g)', value: 'g' },
+  { label: 'ounces (oz)', value: 'oz' },
+  { label: 'pounds (lb)', value: 'lb' },
+  { label: 'kilograms (kg)', value: 'kg' },
+  { label: 'milliliters (ml)', value: 'ml' },
+  { label: 'cup', value: 'cup' },
+  { label: 'tablespoon (tbsp)', value: 'tbsp' },
+  { label: 'teaspoon (tsp)', value: 'tsp' },
+  { label: 'fluid ounce (fl oz)', value: 'fl oz' },
+  { label: 'pint', value: 'pint' },
+  { label: 'quart', value: 'quart' },
+  { label: 'gallon', value: 'gallon' },
+  { label: 'serving', value: 'serving' },
+  { label: 'piece', value: 'piece' },
+  { label: 'slice', value: 'slice' },
+  { label: 'scoop', value: 'scoop' },
+  { label: 'container', value: 'container' },
+  { label: 'package', value: 'package' },
+  { label: 'bottle', value: 'bottle' },
+  { label: 'bar', value: 'bar' },
+  { label: 'Other…', value: CUSTOM_UNIT },
+];
+
+function isListedUnit(unit: string): boolean {
+  const normalized = unit.trim().toLowerCase();
+  return SERVING_UNIT_OPTIONS.some((option) => option.value.toLowerCase() === normalized);
+}
 
 export interface FoodFormValues {
   name: string;
@@ -66,17 +106,22 @@ export function parseFoodFormValues(values: FoodFormValues): ParsedFoodValues | 
   if (!values.name.trim()) {
     return { error: 'Name is required' };
   }
-  const servingAmount = Number(values.servingAmount);
+  const servingAmount = parseServingAmount(values.servingAmount);
   if (!servingAmount || servingAmount <= 0) {
-    return { error: 'Serving amount must be greater than 0' };
+    return { error: 'Serving amount must be greater than 0 (e.g. 1, 1/4, or 1 1/2)' };
   }
   if (!values.servingUnit.trim()) {
     return { error: 'Enter a serving unit (e.g. g, oz, bottle, scoop)' };
   }
   const servingUnit = values.servingUnit.trim();
+  const usVolumeOzPerUnit = ozPerUsVolumeUnit(servingUnit);
   let servingWeightG: number | null = null;
-  if (!isWeighableUnit(servingUnit) && values.servingWeightAmount.trim()) {
-    const weightAmount = Number(values.servingWeightAmount);
+  if (!isWeighableUnit(servingUnit) && usVolumeOzPerUnit != null) {
+    // Recognized US volume unit (cup, tbsp, tsp, fl oz, pint, quart,
+    // gallon) — calculated automatically, not manually entered.
+    servingWeightG = servingAmount * usVolumeOzPerUnit * OZ_TO_G;
+  } else if (!isWeighableUnit(servingUnit) && values.servingWeightAmount.trim()) {
+    const weightAmount = parseServingAmount(values.servingWeightAmount);
     if (!weightAmount || weightAmount <= 0) {
       return { error: 'Weight equivalent amount must be greater than 0' };
     }
@@ -140,6 +185,12 @@ export function FoodForm({
 }: FoodFormProps) {
   const [values, setValues] = useState(initialValues);
   const [error, setError] = useState<string | null>(null);
+  // Whether the Unit dropdown is showing "Other…" with a free-text field —
+  // starts true if the food already has a unit that isn't in the preset list
+  // (e.g. an older/imported unit), so it's never silently hidden or reset.
+  const [customUnitMode, setCustomUnitMode] = useState(
+    () => !!initialValues.servingUnit.trim() && !isListedUnit(initialValues.servingUnit),
+  );
   const insets = useSafeAreaInsets();
   const prevServingRef = useRef({ amount: initialValues.servingAmount, unit: initialValues.servingUnit });
 
@@ -157,8 +208,8 @@ export function FoodForm({
     prevServingRef.current = { amount: values.servingAmount, unit: values.servingUnit };
     if (prev.amount === values.servingAmount && prev.unit === values.servingUnit) return;
 
-    const prevAmount = Number(prev.amount);
-    const newAmount = Number(values.servingAmount);
+    const prevAmount = parseServingAmount(prev.amount);
+    const newAmount = parseServingAmount(values.servingAmount);
     if (!prevAmount || prevAmount <= 0 || !newAmount || newAmount <= 0) return;
 
     let ratio: number | null = null;
@@ -199,9 +250,10 @@ export function FoodForm({
           })
         : null;
 
+      const currentWeightAmount = parseServingAmount(current.servingWeightAmount);
       const scaledWeightAmount =
-        !isWeighableUnit(current.servingUnit) && current.servingWeightAmount.trim()
-          ? String(Math.round(Number(current.servingWeightAmount) * appliedRatio * 100) / 100)
+        !isWeighableUnit(current.servingUnit) && currentWeightAmount != null
+          ? String(Math.round(currentWeightAmount * appliedRatio * 100) / 100)
           : current.servingWeightAmount;
 
       if (!scaledNutrition && scaledWeightAmount === current.servingWeightAmount) return current;
@@ -235,6 +287,21 @@ export function FoodForm({
   const servingDescription =
     values.servingAmount && values.servingUnit ? `${values.servingAmount} ${values.servingUnit}` : 'serving';
 
+  const parsedServingAmount = parseServingAmount(values.servingAmount);
+  const usVolumeOzPerUnit = ozPerUsVolumeUnit(values.servingUnit);
+
+  // Auto-calculated whenever the unit is already a weight/volume unit (e.g.
+  // "1 cup" -> "8 oz") — no manual entry needed since it's derivable. Skips
+  // oz itself, since "= 4 oz" right under "4 oz" would just be noise.
+  const weightEquivalentOz =
+    parsedServingAmount == null || parsedServingAmount <= 0
+      ? null
+      : usVolumeOzPerUnit != null
+        ? parsedServingAmount * usVolumeOzPerUnit
+        : isWeighableUnit(values.servingUnit) && values.servingUnit.trim().toLowerCase() !== 'oz'
+          ? gramsToServing(servingToGrams(parsedServingAmount, values.servingUnit) ?? 0, 'oz')
+          : null;
+
   return (
     <KeyboardAwareScrollView
       style={styles.container}
@@ -266,25 +333,50 @@ export function FoodForm({
               style={styles.input}
               value={values.servingAmount}
               onChangeText={(v) => set('servingAmount', v)}
-              keyboardType="decimal-pad"
-              placeholder="1"
+              placeholder="1, 1/4, or 1 1/2"
               placeholderTextColor={colors.textMuted}
             />
           </View>
           <View style={styles.servingUnitField}>
             <Text style={styles.fieldLabel}>Unit</Text>
-            <TextInput
-              style={styles.input}
-              value={values.servingUnit}
-              onChangeText={(v) => set('servingUnit', v)}
-              placeholder="g, oz, bottle, scoop…"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
+            <Dropdown
+              value={customUnitMode ? CUSTOM_UNIT : values.servingUnit}
+              options={SERVING_UNIT_OPTIONS}
+              placeholder="Select a unit"
+              onChange={(unit) => {
+                if (unit === CUSTOM_UNIT) {
+                  setCustomUnitMode(true);
+                  set('servingUnit', '');
+                } else {
+                  setCustomUnitMode(false);
+                  set('servingUnit', unit);
+                }
+              }}
             />
           </View>
         </View>
 
-        {!isWeighableUnit(values.servingUnit) && (
+        {customUnitMode && (
+          <View style={styles.field}>
+            <Text style={styles.fieldLabel}>Custom unit name</Text>
+            <TextInput
+              style={styles.input}
+              value={values.servingUnit}
+              onChangeText={(v) => set('servingUnit', v)}
+              placeholder="e.g. wing, biscuit, bar"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+            />
+          </View>
+        )}
+
+        {weightEquivalentOz != null && (
+          <Text style={styles.helperCaption}>
+            = {Math.round(weightEquivalentOz * 100) / 100} oz, calculated automatically
+          </Text>
+        )}
+
+        {!isWeighableUnit(values.servingUnit) && usVolumeOzPerUnit == null && values.servingUnit.trim() && (
           <View style={styles.weightEquivalent}>
             <Text style={styles.fieldLabel}>Weight equivalent (optional)</Text>
             <View style={styles.servingSizeRow}>
@@ -293,8 +385,7 @@ export function FoodForm({
                   style={styles.input}
                   value={values.servingWeightAmount}
                   onChangeText={(v) => set('servingWeightAmount', v)}
-                  keyboardType="decimal-pad"
-                  placeholder="12"
+                  placeholder="12 or 1/4"
                   placeholderTextColor={colors.textMuted}
                 />
               </View>
