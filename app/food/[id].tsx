@@ -20,6 +20,7 @@ function foodToFormValues(food: Food): FoodFormValues {
     servingUnit: food.servingUnit,
     servingWeightAmount: weightOz != null ? String(Math.round(weightOz * 100) / 100) : '',
     servingWeightUnit: 'oz',
+    servingsPerContainer: food.servingsPerContainer != null ? String(food.servingsPerContainer) : '',
     calories: String(food.calories),
     proteinG: String(food.proteinG),
     carbsG: String(food.carbsG),

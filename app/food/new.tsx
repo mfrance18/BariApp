@@ -38,6 +38,7 @@ export default function NewFoodScreen() {
     servingUnit: params.servingUnit ?? EMPTY_FOOD_FORM_VALUES.servingUnit,
     servingWeightAmount: offWeightGramsToOzInput(params.servingWeightG),
     servingWeightUnit: 'oz',
+    servingsPerContainer: params.servingsPerContainer ?? '',
     calories: params.calories ?? '',
     proteinG: params.proteinG ?? '',
     carbsG: params.carbsG ?? '',

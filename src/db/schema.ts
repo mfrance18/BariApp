@@ -27,6 +27,10 @@ export const foods = sqliteTable(
     // Lets such a food still be used in recipes / weighed when logging — see
     // getReferenceWeightG in src/services/nutrition/scaling.ts.
     servingWeightG: real('serving_weight_g'),
+    // Optional "servings per container" from the nutrition label (e.g. a
+    // jar labeled "serving size 1/4 cup, 10 servings per container").
+    // Reference-only — purely informational, not used in any calculation.
+    servingsPerContainer: real('servings_per_container'),
     calories: real('calories').notNull().default(0),
     proteinG: real('protein_g').notNull().default(0),
     carbsG: real('carbs_g').notNull().default(0),

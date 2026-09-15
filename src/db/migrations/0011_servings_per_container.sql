@@ -1,0 +1,1 @@
+ALTER TABLE `foods` ADD `servings_per_container` real;

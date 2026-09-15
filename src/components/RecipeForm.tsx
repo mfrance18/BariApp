@@ -14,7 +14,7 @@ import type { OffProduct } from '../services/openFoodFacts/types';
 import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
 import { computeRecipeTotals, getReferenceWeightG, roundNutritionForDisplay, scaleNutrition } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
-import { gramsToServing, isWeighableUnit, servingToGrams } from '../utils/servingUnits';
+import { gramsToServing, isWeighableUnit, parseServingAmount, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Card } from './ui/Card';
@@ -154,6 +154,12 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
   const [pendingIngredient, setPendingIngredient] = useState<Food | null>(null);
   const [quantityAmount, setQuantityAmount] = useState('');
   const [quantityUnit, setQuantityUnit] = useState('');
+  // Optional convenience alternative to Amount/Unit: typing a serving count
+  // here computes the equivalent Amount/Unit (in oz) from the food's own
+  // serving size, e.g. "2" servings of a food whose serving is 1/4 cup fills
+  // in "0.5 cup" -> converted to oz. Cleared whenever Amount/Unit are edited
+  // directly, since it would otherwise show a stale count.
+  const [servingsInput, setServingsInput] = useState('');
   const [nutritionDraft, setNutritionDraft] = useState<NutritionDraft>(EMPTY_NUTRITION_DRAFT);
   const [savingIngredient, setSavingIngredient] = useState(false);
   const [quantityError, setQuantityError] = useState<string | null>(null);
@@ -243,6 +249,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     setQuantityError(null);
     setLiveTrackingPaused(false);
     setScaleSearchEnabled(true);
+    setServingsInput('');
     // Always default to oz for display, regardless of the food's own stored
     // serving unit (often "g", e.g. OFF's per-100g imports) — same
     // oz-by-default convention as the Food form's weight field.
@@ -638,6 +645,7 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
                   onChangeText={(v) => {
                     setQuantityAmount(v);
                     setLiveTrackingPaused(v.trim() !== '');
+                    setServingsInput('');
                   }}
                   editable={!amountFieldLocked}
                   keyboardType="decimal-pad"
@@ -654,12 +662,42 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
                   onChangeText={(v) => {
                     setQuantityUnit(v);
                     setLiveTrackingPaused(true);
+                    setServingsInput('');
                   }}
                   placeholder="g, oz, ml, lb…"
                   placeholderTextColor={colors.textMuted}
                   autoCapitalize="none"
                 />
               </View>
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>Or enter servings (optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={servingsInput}
+                onChangeText={(v) => {
+                  setServingsInput(v);
+                  setLiveTrackingPaused(true);
+                  if (!pendingIngredient) return;
+                  const servings = parseServingAmount(v);
+                  if (servings == null || servings <= 0) return;
+                  try {
+                    const totalOz = gramsToServing(servings * getReferenceWeightG(pendingIngredient), 'oz');
+                    if (totalOz == null) return;
+                    setQuantityAmount(String(Math.round(totalOz * 100) / 100));
+                    setQuantityUnit('oz');
+                  } catch {
+                    // No resolvable reference weight — shouldn't happen since
+                    // requestAddIngredient already guards against this food.
+                  }
+                }}
+                keyboardType="decimal-pad"
+                placeholder={
+                  pendingIngredient ? `e.g. 2 (1 serving = ${pendingIngredient.servingAmount} ${pendingIngredient.servingUnit})` : 'e.g. 2'
+                }
+                placeholderTextColor={colors.textMuted}
+              />
             </View>
 
             {pairedScaleQuery.data && (

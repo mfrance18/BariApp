@@ -57,6 +57,7 @@ export interface FoodFormValues {
   servingUnit: string;
   servingWeightAmount: string;
   servingWeightUnit: string;
+  servingsPerContainer: string;
   calories: string;
   proteinG: string;
   carbsG: string;
@@ -75,6 +76,7 @@ export const EMPTY_FOOD_FORM_VALUES: FoodFormValues = {
   servingUnit: '',
   servingWeightAmount: '',
   servingWeightUnit: 'oz',
+  servingsPerContainer: '',
   calories: '',
   proteinG: '',
   carbsG: '',
@@ -92,6 +94,7 @@ export interface ParsedFoodValues {
   servingAmount: number;
   servingUnit: string;
   servingWeightG: number | null;
+  servingsPerContainer: number | null;
   calories: number;
   proteinG: number;
   carbsG: number;
@@ -132,6 +135,14 @@ export function parseFoodFormValues(values: FoodFormValues): ParsedFoodValues | 
     }
     servingWeightG = grams;
   }
+  let servingsPerContainer: number | null = null;
+  if (values.servingsPerContainer.trim()) {
+    const parsedServingsPerContainer = parseServingAmount(values.servingsPerContainer);
+    if (!parsedServingsPerContainer || parsedServingsPerContainer <= 0) {
+      return { error: 'Servings per container must be greater than 0' };
+    }
+    servingsPerContainer = parsedServingsPerContainer;
+  }
   const num = (s: string) => (s.trim() ? Number(s) : 0);
   return {
     name: values.name.trim(),
@@ -140,6 +151,7 @@ export function parseFoodFormValues(values: FoodFormValues): ParsedFoodValues | 
     servingAmount,
     servingUnit,
     servingWeightG,
+    servingsPerContainer,
     calories: num(values.calories),
     proteinG: num(values.proteinG),
     carbsG: num(values.carbsG),
@@ -302,6 +314,16 @@ export function FoodForm({
           ? gramsToServing(servingToGrams(parsedServingAmount, values.servingUnit) ?? 0, 'oz')
           : null;
 
+  // e.g. "10 servings x 1/4 cup" -> "2.5 cup total in the container".
+  const parsedServingsPerContainer = parseServingAmount(values.servingsPerContainer);
+  const containerTotalAmount =
+    parsedServingAmount != null &&
+    parsedServingAmount > 0 &&
+    parsedServingsPerContainer != null &&
+    parsedServingsPerContainer > 0
+      ? parsedServingAmount * parsedServingsPerContainer
+      : null;
+
   return (
     <KeyboardAwareScrollView
       style={styles.container}
@@ -406,6 +428,23 @@ export function FoodForm({
             </Text>
           </View>
         )}
+
+        <View style={styles.field}>
+          <Text style={styles.fieldLabel}>Servings per container (optional)</Text>
+          <TextInput
+            style={styles.input}
+            value={values.servingsPerContainer}
+            onChangeText={(v) => set('servingsPerContainer', v)}
+            placeholder="e.g. 10"
+            placeholderTextColor={colors.textMuted}
+          />
+          <Text style={styles.helperCaption}>
+            From the nutrition label, e.g. "Serving Size 1/4 cup, 10 servings per container." Reference only — doesn't
+            affect the nutrition below.
+            {containerTotalAmount != null &&
+              ` ≈ ${Math.round(containerTotalAmount * 100) / 100} ${values.servingUnit.trim()} total in the container.`}
+          </Text>
+        </View>
       </Card>
 
       <Card style={styles.card}>
