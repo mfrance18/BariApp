@@ -85,6 +85,13 @@
       "when": 1789436103435,
       "tag": "0011_servings_per_container",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1789437770558,
+      "tag": "0012_vitamins_meds_sort_order",
+      "breakpoints": true
     }
   ]
 }

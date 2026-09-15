@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 
 import { db } from '../client';
 import { medLog, medSchedule, vitaminsMeds } from '../schema';
@@ -8,7 +8,23 @@ export type MedSchedule = typeof medSchedule.$inferSelect;
 export type MedLog = typeof medLog.$inferSelect;
 
 export async function listActiveVitaminsMeds(): Promise<VitaminMed[]> {
-  return db.select().from(vitaminsMeds).where(eq(vitaminsMeds.active, true));
+  return db
+    .select()
+    .from(vitaminsMeds)
+    .where(eq(vitaminsMeds.active, true))
+    .orderBy(asc(vitaminsMeds.sortOrder), asc(vitaminsMeds.id));
+}
+
+/**
+ * Persists a new display order after a drag-and-drop reorder — `orderedIds`
+ * is the full list of vitamin/med ids in their new order. Also drives the
+ * order of the dashboard's checklist card (see getTodayChecklist below).
+ */
+export async function reorderVitaminsMeds(orderedIds: number[]): Promise<void> {
+  const now = new Date().toISOString();
+  for (let i = 0; i < orderedIds.length; i++) {
+    await db.update(vitaminsMeds).set({ sortOrder: i, updatedAt: now }).where(eq(vitaminsMeds.id, orderedIds[i]));
+  }
 }
 
 export async function getVitaminMedById(id: number): Promise<VitaminMed | null> {
@@ -29,9 +45,12 @@ export async function createVitaminMed(input: {
   barcode?: string | null;
 }): Promise<VitaminMed> {
   const now = new Date().toISOString();
+  const [{ maxSortOrder }] = await db
+    .select({ maxSortOrder: sql<number>`coalesce(max(${vitaminsMeds.sortOrder}), -1)` })
+    .from(vitaminsMeds);
   const rows = await db
     .insert(vitaminsMeds)
-    .values({ ...input, createdAt: now, updatedAt: now })
+    .values({ ...input, sortOrder: maxSortOrder + 1, createdAt: now, updatedAt: now })
     .returning();
   return rows[0];
 }
@@ -133,6 +152,11 @@ export async function getTodayChecklist(scheduledDate: string, today: Date = new
   const logByScheduleId = new Map(logRows.map((log) => [log.medScheduleId, log]));
 
   return todaySchedules
+    .slice()
+    // Primarily the vitamin/med's own drag-and-drop order (see
+    // reorderVitaminsMeds), with time of day only as a tiebreak for a
+    // single med with more than one reminder time.
+    .sort((a, b) => a.med.sortOrder - b.med.sortOrder || a.schedule.timeOfDay.localeCompare(b.schedule.timeOfDay))
     .map((row) => {
       const log = logByScheduleId.get(row.schedule.id);
       return {
@@ -147,8 +171,7 @@ export async function getTodayChecklist(scheduledDate: string, today: Date = new
           | 'skipped'
           | 'pending',
       };
-    })
-    .sort((a, b) => a.timeOfDay.localeCompare(b.timeOfDay));
+    });
 }
 
 export async function setStatus(

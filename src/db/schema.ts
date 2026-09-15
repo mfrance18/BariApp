@@ -127,6 +127,11 @@ export const vitaminsMeds = sqliteTable(
     notes: text('notes'),
     barcode: text('barcode'),
     active: integer('active', { mode: 'boolean' }).notNull().default(true),
+    // User-controlled display order (drag-and-drop on the vitamins/meds
+    // list) — also drives the order of the dashboard's checklist card.
+    // Backfilled to each row's own id (creation order) when this column was
+    // added, so existing lists don't reshuffle until reordered.
+    sortOrder: integer('sort_order').notNull().default(0),
     ...timestamps,
   },
   (table) => [uniqueIndex('idx_vitamins_meds_barcode').on(table.barcode)],
