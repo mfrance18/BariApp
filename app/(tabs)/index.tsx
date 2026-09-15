@@ -27,7 +27,7 @@ import { getDailyActivity, hasHealthConnectAccess } from '../../src/services/hea
 import { dismissPresentedNotificationsForSchedule } from '../../src/services/notifications/scheduler';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { formatDisplayDate, formatTimeOfDay, toLogDateKey } from '../../src/utils/date';
+import { formatDisplayDate, formatTimeOfDay, todayLogDateKey, toLogDateKey } from '../../src/utils/date';
 import { mlToOz } from '../../src/utils/units';
 import { gramsToServing } from '../../src/utils/servingUnits';
 
@@ -138,7 +138,14 @@ export default function DashboardScreen() {
             <TouchableOpacity onPress={() => setLogDate((d) => addDays(d, -1))} hitSlop={12}>
               <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
-            <Text style={styles.dateHeading}>{formatDisplayDate(logDate)}</Text>
+            {logDate === todayLogDateKey() ? (
+              <View style={styles.dateHeadingColumn}>
+                <Text style={styles.dateHeading}>Today</Text>
+                <Text style={styles.dateSubheading}>{formatDisplayDate(logDate)}</Text>
+              </View>
+            ) : (
+              <Text style={styles.dateHeading}>{formatDisplayDate(logDate)}</Text>
+            )}
             <TouchableOpacity onPress={() => setLogDate((d) => addDays(d, 1))} hitSlop={12}>
               <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -459,8 +466,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.sm,
   },
+  dateHeadingColumn: {
+    alignItems: 'center',
+  },
   dateHeading: {
     ...typography.heading,
+  },
+  dateSubheading: {
+    ...typography.caption,
+    marginTop: -2,
   },
   ringCardRow: {
     flexDirection: 'row',
