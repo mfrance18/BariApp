@@ -42,7 +42,7 @@ function combineDateKeyWithNow(dateKey: string): Date {
   return combined;
 }
 
-const CUPS_OZ = [4, 8, 12, 16, 20];
+const CUPS_OZ = [4, 8, 12, 16, 20, 32];
 
 function formatOz(oz: number): string {
   return Number.isInteger(oz) ? String(oz) : oz.toFixed(1);
