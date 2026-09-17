@@ -27,7 +27,7 @@ import { getDailyActivity, hasHealthConnectAccess } from '../../src/services/hea
 import { dismissPresentedNotificationsForSchedule } from '../../src/services/notifications/scheduler';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { formatDisplayDate, formatTimeOfDay, todayLogDateKey, toLogDateKey } from '../../src/utils/date';
+import { addLogDays, formatDisplayDate, formatTimeOfDay, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz } from '../../src/utils/units';
 import { gramsToServing } from '../../src/utils/servingUnits';
 
@@ -55,12 +55,6 @@ const MEAL_ICONS: Record<MealType, keyof typeof Ionicons.glyphMap> = {
   dinner: 'moon-outline',
   snack: 'cafe-outline',
 };
-
-function addDays(dateKey: string, days: number): string {
-  const date = new Date(`${dateKey}T00:00:00`);
-  date.setDate(date.getDate() + days);
-  return toLogDateKey(date);
-}
 
 export default function DashboardScreen() {
   const { logDate, setLogDate } = useSelectedLogDate();
@@ -135,7 +129,7 @@ export default function DashboardScreen() {
       ListHeaderComponent={
         <View style={styles.header}>
           <View style={styles.dateNavRow}>
-            <TouchableOpacity onPress={() => setLogDate((d) => addDays(d, -1))} hitSlop={12}>
+            <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, -1))} hitSlop={12}>
               <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
             {logDate === todayLogDateKey() ? (
@@ -146,7 +140,7 @@ export default function DashboardScreen() {
             ) : (
               <Text style={styles.dateHeading}>{formatDisplayDate(logDate)}</Text>
             )}
-            <TouchableOpacity onPress={() => setLogDate((d) => addDays(d, 1))} hitSlop={12}>
+            <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, 1))} hitSlop={12}>
               <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>

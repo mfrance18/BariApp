@@ -9,6 +9,13 @@ export function todayLogDateKey(): string {
   return toLogDateKey(new Date());
 }
 
+/** Shifts a "YYYY-MM-DD" log date key by `days` (negative to go back) — used by every screen's date nav. */
+export function addLogDays(dateKey: string, days: number): string {
+  const date = new Date(`${dateKey}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return toLogDateKey(date);
+}
+
 export function formatDisplayDate(dateKey: string): string {
   return format(new Date(`${dateKey}T00:00:00`), 'EEEE, MMM d');
 }

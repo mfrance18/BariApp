@@ -30,7 +30,7 @@ import {
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { formatDisplayDate, todayLogDateKey } from '../../src/utils/date';
+import { addLogDays, formatDisplayDate, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz, ozToMl } from '../../src/utils/units';
 
 /** Combines a "YYYY-MM-DD" log date with the current wall-clock time — used
@@ -60,7 +60,7 @@ type FluidModalState = { mode: 'add'; amountOz: number | null } | { mode: 'edit'
 
 export default function FluidsScreen() {
   const queryClient = useQueryClient();
-  const { logDate } = useSelectedLogDate();
+  const { logDate, setLogDate } = useSelectedLogDate();
   const [modalState, setModalState] = useState<FluidModalState | null>(null);
 
   const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
@@ -111,9 +111,22 @@ export default function FluidsScreen() {
       keyExtractor={(item) => String(item.id)}
       ListHeaderComponent={
         <View style={styles.header}>
-          <Text style={styles.heading}>
-            {logDate === todayLogDateKey() ? "Today's Fluids" : `${formatDisplayDate(logDate)} Fluids`}
-          </Text>
+          <View style={styles.dateNavRow}>
+            <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, -1))} hitSlop={12}>
+              <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+            {logDate === todayLogDateKey() ? (
+              <View style={styles.dateHeadingColumn}>
+                <Text style={styles.heading}>Today</Text>
+                <Text style={styles.dateSubheading}>{formatDisplayDate(logDate)}</Text>
+              </View>
+            ) : (
+              <Text style={styles.heading}>{formatDisplayDate(logDate)}</Text>
+            )}
+            <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, 1))} hitSlop={12}>
+              <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
 
           <Card style={styles.progressCard}>
             <View style={styles.progressHeaderRow}>
@@ -333,8 +346,23 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.xs,
   },
+  dateNavRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.sm,
+  },
+  dateHeadingColumn: {
+    alignItems: 'center',
+  },
   heading: {
     ...typography.title,
+    textAlign: 'center',
+  },
+  dateSubheading: {
+    ...typography.caption,
+    marginTop: -2,
+    textAlign: 'center',
   },
   progressCard: {
     gap: spacing.sm,
