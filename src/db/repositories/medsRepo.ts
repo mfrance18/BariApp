@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, sql } from 'drizzle-orm';
 
 import { db } from '../client';
 import { medLog, medSchedule, vitaminsMeds } from '../schema';
@@ -132,7 +132,12 @@ export interface TodayChecklistItem {
   name: string;
   type: 'vitamin' | 'medication';
   dosageLabel: string | null;
+  /** The effective time for today — the reschedule override if one is set, otherwise the schedule's normal time. */
   timeOfDay: string;
+  /** The schedule's normal time, regardless of any reschedule — for showing "originally 8:00 AM" context. */
+  originalTimeOfDay: string;
+  /** Set only when this one day's dose was moved to a different time (see rescheduleMedForDate). */
+  rescheduledTimeOfDay: string | null;
   status: 'taken' | 'skipped' | 'pending';
 }
 
@@ -152,19 +157,25 @@ export async function getTodayChecklist(scheduledDate: string, today: Date = new
   const logByScheduleId = new Map(logRows.map((log) => [log.medScheduleId, log]));
 
   return todaySchedules
-    .slice()
-    // Primarily by time of day, with the vitamin/med's own drag-and-drop
-    // order (see reorderVitaminsMeds) as a tiebreak for same-time reminders.
-    .sort((a, b) => a.schedule.timeOfDay.localeCompare(b.schedule.timeOfDay) || a.med.sortOrder - b.med.sortOrder)
     .map((row) => {
       const log = logByScheduleId.get(row.schedule.id);
+      const effectiveTimeOfDay = log?.rescheduledTimeOfDay ?? row.schedule.timeOfDay;
+      return { row, log, effectiveTimeOfDay };
+    })
+    // Primarily by the EFFECTIVE time of day (today's reschedule, if any),
+    // with the vitamin/med's own drag-and-drop order (see
+    // reorderVitaminsMeds) as a tiebreak for same-time reminders.
+    .sort((a, b) => a.effectiveTimeOfDay.localeCompare(b.effectiveTimeOfDay) || a.row.med.sortOrder - b.row.med.sortOrder)
+    .map(({ row, log, effectiveTimeOfDay }) => {
       return {
         scheduleId: row.schedule.id,
         vitaminMedId: row.med.id,
         name: row.med.name,
         type: row.med.type,
         dosageLabel: row.med.dosageLabel,
-        timeOfDay: row.schedule.timeOfDay,
+        timeOfDay: effectiveTimeOfDay,
+        originalTimeOfDay: row.schedule.timeOfDay,
+        rescheduledTimeOfDay: log?.rescheduledTimeOfDay ?? null,
         status: (log?.status === 'taken' || log?.status === 'skipped' ? log.status : 'pending') as
           | 'taken'
           | 'skipped'
@@ -200,8 +211,144 @@ export async function setStatus(
   }
 }
 
+/**
+ * Clears back to "pending". If the row only exists to carry a reschedule
+ * override (see rescheduleMedForDate), that override is kept and just the
+ * status is cleared, rather than deleting the row.
+ */
 export async function clearStatus(scheduleId: number, scheduledDate: string): Promise<void> {
-  await db
-    .delete(medLog)
+  const existing = await db
+    .select()
+    .from(medLog)
     .where(and(eq(medLog.medScheduleId, scheduleId), eq(medLog.scheduledDate, scheduledDate)));
+
+  if (existing.length === 0) return;
+  if (existing[0].rescheduledTimeOfDay != null) {
+    await db.update(medLog).set({ status: null, takenAt: null }).where(eq(medLog.id, existing[0].id));
+  } else {
+    await db.delete(medLog).where(eq(medLog.id, existing[0].id));
+  }
+}
+
+async function setRescheduleOverride(scheduleId: number, scheduledDate: string, timeOfDay: string): Promise<void> {
+  const existing = await db
+    .select()
+    .from(medLog)
+    .where(and(eq(medLog.medScheduleId, scheduleId), eq(medLog.scheduledDate, scheduledDate)));
+
+  if (existing.length > 0) {
+    await db.update(medLog).set({ rescheduledTimeOfDay: timeOfDay }).where(eq(medLog.id, existing[0].id));
+  } else {
+    await db.insert(medLog).values({
+      medScheduleId: scheduleId,
+      scheduledDate,
+      status: null,
+      takenAt: null,
+      rescheduledTimeOfDay: timeOfDay,
+      createdAt: new Date().toISOString(),
+    });
+  }
+}
+
+function timeOfDayToMinutes(timeOfDay: string): number {
+  const [hour, minute] = timeOfDay.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function minutesToTimeOfDay(totalMinutes: number): string {
+  const clamped = Math.max(0, Math.min(23 * 60 + 59, totalMinutes));
+  const hour = Math.floor(clamped / 60);
+  const minute = clamped % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * Moves just this one day's dose to a different time, without touching the
+ * recurring med_schedule — call rescheduleAll() afterward to update the
+ * actual system notification (see scheduler.ts).
+ *
+ * Also cascades the same shift to any of this vitamin/med's OTHER reminder
+ * times due today that fall later than the dose being moved (by its time
+ * before this edit), preserving the gap between them — e.g. pushing an
+ * 11:30 dose to 1pm also pushes that day's 2pm dose of the same medication
+ * to 3:30pm. A dose already taken/skipped today, or one due today but
+ * scheduled earlier than the edited dose, is left alone.
+ */
+export async function rescheduleMedForDate(
+  vitaminMedId: number,
+  scheduleId: number,
+  scheduledDate: string,
+  timeOfDay: string,
+): Promise<void> {
+  const todayDay = String(new Date(`${scheduledDate}T00:00:00`).getDay());
+
+  const dueToday = (
+    await db.select().from(medSchedule).where(and(eq(medSchedule.vitaminMedId, vitaminMedId), eq(medSchedule.active, true)))
+  ).filter((s) => s.daysOfWeek.split(',').includes(todayDay));
+
+  const editedSchedule = dueToday.find((s) => s.id === scheduleId);
+  if (!editedSchedule) {
+    // Not due today (or inactive) — nothing to cascade to.
+    await setRescheduleOverride(scheduleId, scheduledDate, timeOfDay);
+    return;
+  }
+
+  const logRows = await db
+    .select()
+    .from(medLog)
+    .where(
+      and(
+        eq(medLog.scheduledDate, scheduledDate),
+        inArray(
+          medLog.medScheduleId,
+          dueToday.map((s) => s.id),
+        ),
+      ),
+    );
+  const logByScheduleId = new Map(logRows.map((log) => [log.medScheduleId, log]));
+
+  const oldEffectiveMinutes = timeOfDayToMinutes(
+    logByScheduleId.get(scheduleId)?.rescheduledTimeOfDay ?? editedSchedule.timeOfDay,
+  );
+  const deltaMinutes = timeOfDayToMinutes(timeOfDay) - oldEffectiveMinutes;
+
+  await setRescheduleOverride(scheduleId, scheduledDate, timeOfDay);
+  if (deltaMinutes === 0) return;
+
+  for (const sibling of dueToday) {
+    if (sibling.id === scheduleId) continue;
+    const siblingLog = logByScheduleId.get(sibling.id);
+    if (siblingLog?.status === 'taken' || siblingLog?.status === 'skipped') continue;
+    const siblingEffectiveMinutes = timeOfDayToMinutes(siblingLog?.rescheduledTimeOfDay ?? sibling.timeOfDay);
+    if (siblingEffectiveMinutes <= oldEffectiveMinutes) continue;
+    await setRescheduleOverride(sibling.id, scheduledDate, minutesToTimeOfDay(siblingEffectiveMinutes + deltaMinutes));
+  }
+}
+
+/**
+ * Reverts a rescheduled dose back to its normal scheduled time. If the row
+ * has no taken/skipped status either, it's removed entirely rather than
+ * left as an empty placeholder.
+ */
+export async function clearRescheduleForDate(scheduleId: number, scheduledDate: string): Promise<void> {
+  const existing = await db
+    .select()
+    .from(medLog)
+    .where(and(eq(medLog.medScheduleId, scheduleId), eq(medLog.scheduledDate, scheduledDate)));
+
+  if (existing.length === 0) return;
+  if (existing[0].status != null) {
+    await db.update(medLog).set({ rescheduledTimeOfDay: null }).where(eq(medLog.id, existing[0].id));
+  } else {
+    await db.delete(medLog).where(eq(medLog.id, existing[0].id));
+  }
+}
+
+/** Every active reschedule override for a given date — used by the notification scheduler (see scheduler.ts). */
+export async function listReschedulesForDate(scheduledDate: string): Promise<Map<number, string>> {
+  const rows = await db
+    .select({ medScheduleId: medLog.medScheduleId, rescheduledTimeOfDay: medLog.rescheduledTimeOfDay })
+    .from(medLog)
+    .where(and(eq(medLog.scheduledDate, scheduledDate), isNotNull(medLog.rescheduledTimeOfDay)));
+  return new Map(rows.map((row) => [row.medScheduleId, row.rescheduledTimeOfDay!]));
 }

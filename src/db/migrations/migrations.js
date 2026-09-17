@@ -14,6 +14,7 @@ import m0009 from './0009_ble_scale_pairing.sql';
 import m0010 from './0010_ble_scale_device_name_fix.sql';
 import m0011 from './0011_servings_per_container.sql';
 import m0012 from './0012_vitamins_meds_sort_order.sql';
+import m0013 from './0013_med_log_reschedule.sql';
 
   export default {
     journal,
@@ -30,7 +31,8 @@ m0008,
 m0009,
 m0010,
 m0011,
-m0012
+m0012,
+m0013
     }
   }
   

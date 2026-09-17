@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
   Dimensions,
   FlatList,
+  Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,17 +17,25 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 
+import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
 import { ProgressRing } from '../../src/components/ui/ProgressRing';
 import { SwipeToDelete } from '../../src/components/ui/SwipeToDelete';
 import { listEntriesForDate as listFluidEntriesForDate } from '../../src/db/repositories/fluidRepo';
 import { deleteEntry, listEntriesForDate, type MealLogEntryWithName } from '../../src/db/repositories/mealLogRepo';
-import { clearStatus, getTodayChecklist, setStatus, type TodayChecklistItem } from '../../src/db/repositories/medsRepo';
+import {
+  clearRescheduleForDate,
+  clearStatus,
+  getTodayChecklist,
+  rescheduleMedForDate,
+  setStatus,
+  type TodayChecklistItem,
+} from '../../src/db/repositories/medsRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
 import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
 import { getDailyActivity, hasHealthConnectAccess } from '../../src/services/healthConnect/adapter';
-import { dismissPresentedNotificationsForSchedule } from '../../src/services/notifications/scheduler';
+import { dismissPresentedNotificationsForSchedule, rescheduleAll } from '../../src/services/notifications/scheduler';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
 import { addLogDays, formatDisplayDate, formatTimeOfDay, todayLogDateKey } from '../../src/utils/date';
@@ -56,10 +67,24 @@ const MEAL_ICONS: Record<MealType, keyof typeof Ionicons.glyphMap> = {
   snack: 'cafe-outline',
 };
 
+function timeOfDayToDate(timeOfDay: string): Date {
+  const [hour, minute] = timeOfDay.split(':').map(Number);
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+  return date;
+}
+
+function dateToTimeOfDay(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 export default function DashboardScreen() {
   const { logDate, setLogDate } = useSelectedLogDate();
   const queryClient = useQueryClient();
   const [activeCardIndex, setActiveCardIndex] = useState(0);
+  const [rescheduleItem, setRescheduleItem] = useState<TodayChecklistItem | null>(null);
+  const [rescheduleTime, setRescheduleTime] = useState(new Date());
+  const [showReschedulePicker, setShowReschedulePicker] = useState(Platform.OS === 'ios');
 
   function handleCarouselMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const index = Math.round(event.nativeEvent.contentOffset.x / CAROUSEL_CARD_WIDTH);
@@ -107,6 +132,40 @@ export default function DashboardScreen() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['medsChecklist', logDate] }),
   });
 
+  const rescheduleMutation = useMutation({
+    mutationFn: async ({ item, timeOfDay }: { item: TodayChecklistItem; timeOfDay: string }) => {
+      await rescheduleMedForDate(item.vitaminMedId, item.scheduleId, logDate, timeOfDay);
+      await rescheduleAll();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medsChecklist', logDate] });
+      setRescheduleItem(null);
+    },
+  });
+
+  const clearRescheduleMutation = useMutation({
+    mutationFn: async (item: TodayChecklistItem) => {
+      await clearRescheduleForDate(item.scheduleId, logDate);
+      await rescheduleAll();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['medsChecklist', logDate] });
+      setRescheduleItem(null);
+    },
+  });
+
+  function openReschedule(item: TodayChecklistItem) {
+    setRescheduleTime(timeOfDayToDate(item.timeOfDay));
+    setShowReschedulePicker(Platform.OS === 'ios');
+    setRescheduleItem(item);
+  }
+
+  function handleRescheduleTimeChange(event: DateTimePickerEvent, date?: Date) {
+    if (Platform.OS === 'android') setShowReschedulePicker(false);
+    if (event.type === 'dismissed' || !date) return;
+    setRescheduleTime(date);
+  }
+
   const grouped = groupEntriesByMeal(entries ?? []);
   const fluidTotalMl = (fluidEntries ?? []).reduce((sum, e) => sum + e.amountMl, 0);
   const fluidGoalMl = settings?.dailyFluidGoalMl ?? 1500;
@@ -121,6 +180,7 @@ export default function DashboardScreen() {
   const proteinProgress = proteinGoal > 0 ? Math.min(1, dailyTotals.proteinG / proteinGoal) : 0;
 
   return (
+    <>
     <FlatList
       style={styles.container}
       contentContainerStyle={styles.content}
@@ -291,8 +351,18 @@ export default function DashboardScreen() {
                   <Text style={styles.medMeta}>
                     {item.dosageLabel ? `${item.dosageLabel} · ` : ''}
                     {formatTimeOfDay(item.timeOfDay)}
+                    {item.rescheduledTimeOfDay && ` (was ${formatTimeOfDay(item.originalTimeOfDay)})`}
                   </Text>
                 </View>
+                {logDate === todayLogDateKey() && item.status === 'pending' && (
+                  <TouchableOpacity onPress={() => openReschedule(item)} hitSlop={8} style={styles.medRescheduleButton}>
+                    <Ionicons
+                      name={item.rescheduledTimeOfDay ? 'time' : 'time-outline'}
+                      size={20}
+                      color={item.rescheduledTimeOfDay ? colors.primary : colors.textMuted}
+                    />
+                  </TouchableOpacity>
+                )}
                 {item.status === 'taken' ? (
                   <Ionicons name="checkmark-circle" size={22} color={colors.success} />
                 ) : (
@@ -304,6 +374,49 @@ export default function DashboardScreen() {
         ) : null
       }
     />
+    {rescheduleItem && (
+      <Modal visible transparent animationType="slide" onRequestClose={() => setRescheduleItem(null)}>
+        <View style={styles.rescheduleOverlay}>
+          <Card style={styles.rescheduleCard}>
+            <Text style={styles.rescheduleTitle}>Reschedule {rescheduleItem.name}</Text>
+            <Text style={styles.rescheduleHint}>
+              Changes just today's reminder — stays at {formatTimeOfDay(rescheduleItem.originalTimeOfDay)} on other
+              days. Later reminders for this medication today shift by the same amount.
+            </Text>
+
+            {Platform.OS === 'android' ? (
+              <TouchableOpacity style={styles.rescheduleTimeButton} onPress={() => setShowReschedulePicker(true)}>
+                <Ionicons name="time-outline" size={18} color={colors.primary} />
+                <Text style={styles.rescheduleTimeButtonText}>
+                  {rescheduleTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <DateTimePicker value={rescheduleTime} mode="time" display="spinner" onChange={handleRescheduleTimeChange} />
+            )}
+            {Platform.OS === 'android' && showReschedulePicker && (
+              <DateTimePicker value={rescheduleTime} mode="time" display="default" onChange={handleRescheduleTimeChange} />
+            )}
+
+            <AppButton
+              title={rescheduleMutation.isPending ? 'Saving…' : 'Save New Time'}
+              onPress={() => rescheduleMutation.mutate({ item: rescheduleItem, timeOfDay: dateToTimeOfDay(rescheduleTime) })}
+              disabled={rescheduleMutation.isPending}
+            />
+            {rescheduleItem.rescheduledTimeOfDay && (
+              <AppButton
+                title={clearRescheduleMutation.isPending ? 'Resetting…' : 'Reset to Original Time'}
+                variant="secondary"
+                onPress={() => clearRescheduleMutation.mutate(rescheduleItem)}
+                disabled={clearRescheduleMutation.isPending}
+              />
+            )}
+            <AppButton title="Cancel" variant="secondary" onPress={() => setRescheduleItem(null)} />
+          </Card>
+        </View>
+      </Modal>
+    )}
+    </>
   );
 }
 
@@ -694,6 +807,41 @@ const styles = StyleSheet.create({
     borderRadius: 11,
     borderWidth: 2,
     borderColor: colors.border,
+  },
+  medRescheduleButton: {
+    padding: 2,
+  },
+  rescheduleOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  rescheduleCard: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    gap: spacing.md,
+  },
+  rescheduleTitle: {
+    ...typography.heading,
+  },
+  rescheduleHint: {
+    ...typography.caption,
+  },
+  rescheduleTimeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    alignSelf: 'flex-start',
+  },
+  rescheduleTimeButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.textPrimary,
   },
   mealSection: {
     gap: spacing.sm,

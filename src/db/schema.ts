@@ -161,8 +161,15 @@ export const medLog = sqliteTable(
       .notNull()
       .references(() => medSchedule.id, { onDelete: 'cascade' }),
     scheduledDate: text('scheduled_date').notNull(),
-    status: text('status', { enum: ['taken', 'missed', 'skipped'] }).notNull(),
+    // Null means no taken/skipped decision yet — a row can still exist in
+    // that state purely to carry a rescheduledTimeOfDay override.
+    status: text('status', { enum: ['taken', 'missed', 'skipped'] }),
     takenAt: text('taken_at'),
+    // Moves just this one day's dose to a different time ("HH:MM", 24-hour)
+    // without touching the recurring med_schedule — e.g. "I'm taking this
+    // later today." Null means "use the schedule's normal time." See
+    // rescheduleMedForDate / scheduler.ts.
+    rescheduledTimeOfDay: text('rescheduled_time_of_day'),
     createdAt: timestamps.createdAt,
   },
   (table) => [
