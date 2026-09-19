@@ -8,17 +8,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createFood, getFoodByBarcode, listFoods, updateFood, type Food } from '../db/repositories/foodsRepo';
 import { useLiveScaleWeight } from '../hooks/useLiveScaleWeight';
 import { getPairedScale } from '../services/bleScale/adapter';
+import { mapFdcFoodToFood } from '../services/fdc/mapper';
+import type { FdcFood } from '../services/fdc/types';
+import { useFdcFoodSearch } from '../services/fdc/useFdcFoodSearch';
 import { getProductByBarcode } from '../services/openFoodFacts/client';
 import { mapOffProductToFood, type OffFoodInput } from '../services/openFoodFacts/mapper';
-import type { OffProduct } from '../services/openFoodFacts/types';
-import { useOffFoodSearch } from '../services/openFoodFacts/useOffFoodSearch';
 import { computeRecipeTotals, getReferenceWeightG, roundNutritionForDisplay, scaleNutrition } from '../services/nutrition/scaling';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { gramsToServing, isWeighableUnit, parseServingAmount, servingToGrams } from '../utils/servingUnits';
 import { AppButton } from './ui/AppButton';
 import { BarcodeScanner } from './BarcodeScanner';
 import { Card } from './ui/Card';
-import { OffFoodResults } from './OffFoodResults';
+import { FdcFoodResults } from './FdcFoodResults';
 import { ScaleStatusRow } from './ui/ScaleStatusRow';
 
 interface NutritionDraft {
@@ -63,14 +64,14 @@ function nutritionDraftForQuantity(food: Food, amount: number, unit: string): Nu
 }
 
 /**
- * A food that doesn't exist in the library yet (e.g. resolved from an OFF
- * search or barcode scan) — identified by a negative placeholder id so it's
- * distinguishable from a real, persisted food. Only actually written to the
- * database once the recipe itself is saved (see `handleSubmit`).
+ * A food that doesn't exist in the library yet (e.g. resolved from an FDC
+ * search or an OFF barcode scan) — identified by a negative placeholder id
+ * so it's distinguishable from a real, persisted food. Only actually written
+ * to the database once the recipe itself is saved (see `handleSubmit`).
  */
 function buildPendingFood(input: OffFoodInput, tempId: number): Food {
   const now = new Date().toISOString();
-  // mapOffProductToFood always sets every field explicitly (never leaves one
+  // The mappers always set every field explicitly (never leave one
   // undefined), so this is a real Food shape even though OffFoodInput's
   // insert-derived type marks defaulted columns as optional.
   return { id: tempId, createdAt: now, updatedAt: now, ...input } as Food;
@@ -207,8 +208,8 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     enabled: searchText.trim().length > 0,
   });
 
-  const showOffSearch = searchText.trim().length > 1;
-  const offSearch = useOffFoodSearch(searchText, showOffSearch);
+  const showFdcSearch = searchText.trim().length > 1;
+  const fdcSearch = useFdcFoodSearch(searchText, showFdcSearch);
 
   const preview = useMemo(() => {
     const servingsNum = Number(servings) || 1;
@@ -356,19 +357,22 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
     return ingredients.find((i) => i.food.id < 0 && i.food.barcode === barcode)?.food ?? null;
   }
 
-  async function handleSelectOffProduct(product: OffProduct) {
+  async function handleSelectFdcFood(fdcFood: FdcFood) {
     try {
-      const existing = await getFoodByBarcode(product.code);
-      if (existing) {
-        requestAddIngredient(existing);
-        return;
+      const barcode = fdcFood.gtinUpc?.trim();
+      if (barcode) {
+        const existing = await getFoodByBarcode(barcode);
+        if (existing) {
+          requestAddIngredient(existing);
+          return;
+        }
+        const pending = findPendingDraftByBarcode(barcode);
+        if (pending) {
+          requestAddIngredient(pending);
+          return;
+        }
       }
-      const pending = findPendingDraftByBarcode(product.code);
-      if (pending) {
-        requestAddIngredient(pending);
-        return;
-      }
-      const draft = buildPendingFood(mapOffProductToFood(product, product.code), nextTempIdRef.current--);
+      const draft = buildPendingFood(mapFdcFoodToFood(fdcFood), nextTempIdRef.current--);
       requestAddIngredient(draft);
     } catch (err) {
       setError((err as Error).message);
@@ -565,17 +569,18 @@ export function RecipeForm({ initialValues, submitLabel, submitting, onSubmit, s
           ))}
         </Card>
       )}
-      {showOffSearch && (
+      {showFdcSearch && (
         <View style={styles.offSection}>
-          <OffFoodResults
-            results={offSearch.results}
-            loading={offSearch.loading}
-            error={offSearch.error}
-            onRetry={offSearch.retry}
-            hasMore={offSearch.hasMore}
-            loadingMore={offSearch.loadingMore}
-            onLoadMore={offSearch.loadMore}
-            onSelect={handleSelectOffProduct}
+          <FdcFoodResults
+            results={fdcSearch.results}
+            loading={fdcSearch.loading}
+            error={fdcSearch.error}
+            onRetry={fdcSearch.retry}
+            hasMore={fdcSearch.hasMore}
+            loadingMore={fdcSearch.loadingMore}
+            onLoadMore={fdcSearch.loadMore}
+            needsApiKey={fdcSearch.needsApiKey}
+            onSelect={handleSelectFdcFood}
           />
         </View>
       )}

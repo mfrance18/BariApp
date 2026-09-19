@@ -23,8 +23,6 @@ export interface OffProduct {
   code: string;
   product_name?: string;
   brands?: string;
-  generic_name?: string;
-  categories?: string;
   serving_size?: string;
   serving_quantity?: number;
   nutriments?: OffNutriments;
@@ -33,8 +31,4 @@ export interface OffProduct {
 export interface OffProductResponse {
   status: 0 | 1;
   product?: OffProduct;
-}
-
-export interface OffSearchResponse {
-  products?: OffProduct[];
 }

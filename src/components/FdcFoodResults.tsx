@@ -1,26 +1,28 @@
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { navigateToExistingFoodByBarcode, navigateToPrefilledFoodForm, type FoodMatchContext } from '../services/openFoodFacts/navigation';
-import type { OffProduct } from '../services/openFoodFacts/types';
+import { mapFdcFoodToFood } from '../services/fdc/mapper';
+import type { FdcFood } from '../services/fdc/types';
 import { colors, radius, spacing, typography } from '../theme/theme';
 import { AppButton } from './ui/AppButton';
 
-interface OffFoodResultsProps {
-  results: OffProduct[];
+interface FdcFoodResultsProps {
+  results: FdcFood[];
   loading: boolean;
   error?: Error | null;
   onRetry?: () => void;
   hasMore?: boolean;
   loadingMore?: boolean;
   onLoadMore?: () => void;
+  needsApiKey?: boolean;
   /** Default behavior: navigate to the existing/new food screen. Required unless onSelect is given. */
   context?: FoodMatchContext;
   /** Overrides the default navigation with a custom handler (e.g. create-and-use-inline instead of navigating away). */
-  onSelect?: (product: OffProduct) => void;
+  onSelect?: (food: FdcFood) => void;
 }
 
-/** Lets the user search Open Food Facts and pick a match, alongside whatever's already in the local library. */
-export function OffFoodResults({
+/** Lets the user search USDA FoodData Central and pick a match, alongside whatever's already in the local library. */
+export function FdcFoodResults({
   results,
   loading,
   error,
@@ -28,25 +30,41 @@ export function OffFoodResults({
   hasMore,
   loadingMore,
   onLoadMore,
+  needsApiKey,
   context,
   onSelect,
-}: OffFoodResultsProps) {
-  async function handlePress(product: OffProduct) {
+}: FdcFoodResultsProps) {
+  async function handlePress(food: FdcFood) {
     if (onSelect) {
-      onSelect(product);
+      onSelect(food);
       return;
     }
     if (!context) return;
-    const handledExisting = await navigateToExistingFoodByBarcode(product.code, context);
+    const barcode = food.gtinUpc?.trim();
+    const handledExisting = barcode ? await navigateToExistingFoodByBarcode(barcode, context) : false;
     if (!handledExisting) {
-      navigateToPrefilledFoodForm(product, product.code, context);
+      navigateToPrefilledFoodForm(mapFdcFoodToFood(food), barcode ?? '', context);
     }
+  }
+
+  if (needsApiKey) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.sectionLabel}>FROM USDA FOODDATA CENTRAL</Text>
+        <Text style={styles.emptyText}>
+          Add your free USDA FoodData Central API key in Settings to search here.{' '}
+          <Text style={styles.link} onPress={() => Linking.openURL('https://api.data.gov/signup')}>
+            Get one at api.data.gov/signup
+          </Text>
+        </Text>
+      </View>
+    );
   }
 
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
+        <Text style={styles.sectionLabel}>FROM USDA FOODDATA CENTRAL</Text>
         <View style={styles.center}>
           <ActivityIndicator color={colors.primary} />
         </View>
@@ -57,8 +75,8 @@ export function OffFoodResults({
   if (error) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
-        <Text style={styles.emptyText}>Couldn't reach Open Food Facts: {error.message}</Text>
+        <Text style={styles.sectionLabel}>FROM USDA FOODDATA CENTRAL</Text>
+        <Text style={styles.emptyText}>Couldn't reach FoodData Central: {error.message}</Text>
         {onRetry && <AppButton title="Retry" variant="secondary" onPress={onRetry} />}
       </View>
     );
@@ -67,20 +85,20 @@ export function OffFoodResults({
   if (results.length === 0) {
     return (
       <View style={styles.container}>
-        <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
-        <Text style={styles.emptyText}>No matches on Open Food Facts.</Text>
+        <Text style={styles.sectionLabel}>FROM USDA FOODDATA CENTRAL</Text>
+        <Text style={styles.emptyText}>No matches on FoodData Central.</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionLabel}>FROM OPEN FOOD FACTS</Text>
-      {results.map((product) => (
-        <TouchableOpacity key={product.code} style={styles.row} onPress={() => handlePress(product)}>
+      <Text style={styles.sectionLabel}>FROM USDA FOODDATA CENTRAL</Text>
+      {results.map((food) => (
+        <TouchableOpacity key={food.fdcId} style={styles.row} onPress={() => handlePress(food)}>
           <View style={styles.rowTextGroup}>
-            <Text style={styles.rowTitle}>{product.product_name}</Text>
-            {product.brands ? <Text style={styles.rowSubtitle}>{product.brands.split(',')[0]?.trim()}</Text> : null}
+            <Text style={styles.rowTitle}>{food.description}</Text>
+            {(food.brandName || food.brandOwner) && <Text style={styles.rowSubtitle}>{food.brandName || food.brandOwner}</Text>}
           </View>
           <Text style={styles.addLabel}>Add</Text>
         </TouchableOpacity>
@@ -138,5 +156,9 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     textAlign: 'center',
     paddingVertical: spacing.sm,
+  },
+  link: {
+    color: colors.primary,
+    fontWeight: '600',
   },
 });

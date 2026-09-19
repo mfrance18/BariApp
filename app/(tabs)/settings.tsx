@@ -1,13 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
 import { getSettings, updateSettings } from '../../src/db/repositories/settingsRepo';
 import { getPairedScale, pairScale, unpairScale } from '../../src/services/bleScale/adapter';
+import { clearFdcApiKey, getFdcApiKey, setFdcApiKey } from '../../src/services/fdc/apiKey';
 import {
   hasHealthConnectAccess,
   openHealthConnectManagement,
@@ -102,6 +103,32 @@ export default function SettingsScreen() {
     },
   });
 
+  const [fdcApiKeyInput, setFdcApiKeyInput] = useState('');
+  const fdcApiKeyInitialized = useRef(false);
+
+  const fdcApiKeyQuery = useQuery({ queryKey: ['fdc', 'apiKey'], queryFn: getFdcApiKey });
+
+  useEffect(() => {
+    if (fdcApiKeyQuery.data && !fdcApiKeyInitialized.current) {
+      setFdcApiKeyInput(fdcApiKeyQuery.data);
+      fdcApiKeyInitialized.current = true;
+    }
+  }, [fdcApiKeyQuery.data]);
+
+  const saveFdcApiKeyMutation = useMutation({
+    mutationFn: () => setFdcApiKey(fdcApiKeyInput),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['fdc', 'apiKey'] }),
+  });
+
+  const clearFdcApiKeyMutation = useMutation({
+    mutationFn: clearFdcApiKey,
+    onSuccess: () => {
+      setFdcApiKeyInput('');
+      fdcApiKeyInitialized.current = false;
+      queryClient.invalidateQueries({ queryKey: ['fdc', 'apiKey'] });
+    },
+  });
+
   const pairedScaleQuery = useQuery({ queryKey: ['pairedScale'], queryFn: getPairedScale });
 
   const pairScaleMutation = useMutation({
@@ -190,6 +217,38 @@ export default function SettingsScreen() {
             disabled={unpairScaleMutation.isPending}
           />
         )}
+      </Section>
+      <Section title="Food Search">
+        <Text style={styles.rowText}>
+          {fdcApiKeyQuery.data ? 'Connected to USDA FoodData Central' : 'Add your free API key to search foods by name'}
+        </Text>
+        <TextInput
+          style={styles.apiKeyInput}
+          value={fdcApiKeyInput}
+          onChangeText={setFdcApiKeyInput}
+          placeholder="USDA FoodData Central API key"
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+        <AppButton
+          title={saveFdcApiKeyMutation.isPending ? 'Saving…' : 'Save Key'}
+          variant="secondary"
+          onPress={() => saveFdcApiKeyMutation.mutate()}
+          disabled={!fdcApiKeyInput.trim() || saveFdcApiKeyMutation.isPending}
+        />
+        {saveFdcApiKeyMutation.isSuccess && <Text style={styles.helperText}>Key saved.</Text>}
+        {fdcApiKeyQuery.data && (
+          <AppButton
+            title="Remove Key"
+            variant="text"
+            onPress={() => clearFdcApiKeyMutation.mutate()}
+            disabled={clearFdcApiKeyMutation.isPending}
+          />
+        )}
+        <Text style={styles.helperText} onPress={() => Linking.openURL('https://api.data.gov/signup')}>
+          Don't have a key? Get one free at api.data.gov/signup
+        </Text>
       </Section>
       {Platform.OS === 'android' && (
         <Section title="Health Data">
@@ -360,6 +419,15 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.textSecondary,
     minWidth: 32,
+  },
+  apiKeyInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    fontSize: 15,
+    color: colors.textPrimary,
   },
   helperText: {
     fontSize: 13,

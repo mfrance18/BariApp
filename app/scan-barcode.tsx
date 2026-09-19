@@ -2,6 +2,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { BarcodeScanner } from '../src/components/BarcodeScanner';
 import { getProductByBarcode } from '../src/services/openFoodFacts/client';
+import { mapOffProductToFood } from '../src/services/openFoodFacts/mapper';
 import { navigateToExistingFoodByBarcode, navigateToPrefilledFoodForm } from '../src/services/openFoodFacts/navigation';
 
 export default function ScanBarcodeScreen() {
@@ -18,7 +19,7 @@ export default function ScanBarcodeScreen() {
     if (handledExisting) return;
 
     const product = await getProductByBarcode(barcode);
-    navigateToPrefilledFoodForm(product, barcode, context);
+    navigateToPrefilledFoodForm(product ? mapOffProductToFood(product, barcode) : null, barcode, context);
   }
 
   return <BarcodeScanner onScanned={handleScanned} />;

@@ -1,8 +1,7 @@
 import { router } from 'expo-router';
 
 import { getFoodByBarcode } from '../../db/repositories/foodsRepo';
-import { mapOffProductToFood } from './mapper';
-import type { OffProduct } from './types';
+import type { OffFoodInput } from './mapper';
 
 export interface FoodMatchContext {
   destination: string;
@@ -40,15 +39,11 @@ export async function navigateToExistingFoodByBarcode(barcode: string, context: 
   return true;
 }
 
-/** Navigates to the destination form, prefilled from an OFF product (or blank with just the barcode if product is null). */
-export function navigateToPrefilledFoodForm(
-  product: OffProduct | null,
-  barcode: string,
-  context: FoodMatchContext,
-): void {
+/** Navigates to the destination form, prefilled from an already-mapped food (or blank with just the barcode if null). */
+export function navigateToPrefilledFoodForm(food: OffFoodInput | null, barcode: string, context: FoodMatchContext): void {
   const navigate = context.replace ? router.replace : router.push;
 
-  if (!product) {
+  if (!food) {
     navigate({
       pathname: context.destination as never,
       params: { barcode, logMealType: context.logMealType, logDate: context.logDate },
@@ -56,7 +51,6 @@ export function navigateToPrefilledFoodForm(
     return;
   }
 
-  const food = mapOffProductToFood(product, barcode);
   navigate({
     pathname: context.destination as never,
     params: {
@@ -73,7 +67,7 @@ export function navigateToPrefilledFoodForm(
       fiberG: String(food.fiberG),
       sugarG: String(food.sugarG),
       sodiumMg: String(food.sodiumMg),
-      source: 'open_food_facts',
+      source: food.source,
       logMealType: context.logMealType,
       logDate: context.logDate,
     },

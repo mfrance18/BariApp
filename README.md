@@ -10,10 +10,10 @@ reminders.
 
 - [Expo](https://expo.dev) + TypeScript, [`expo-router`](https://expo.github.io/router/) for navigation
 - On-device SQLite via `expo-sqlite` + [`drizzle-orm`](https://orm.drizzle.team) (local-first, single-user — no backend server)
-- `expo-secure-store` for VeSync credentials
+- `expo-secure-store` for VeSync credentials and your USDA FoodData Central API key
 - `expo-camera` for barcode scanning
 - `expo-notifications` for local vitamin/medication reminders
-- [Open Food Facts](https://world.openfoodfacts.org) for barcode/nutrition lookups
+- [Open Food Facts](https://world.openfoodfacts.org) for barcode lookups, [USDA FoodData Central](https://fdc.nal.usda.gov) for search-by-name (requires your own free API key, entered in Settings)
 - A reverse-engineered VeSync cloud API client (no official third-party API exists) for scale readings
 
 ## Getting started
@@ -39,7 +39,8 @@ code with Expo Go.
 - `app/` — screens and navigation (Expo Router file-based routing)
 - `src/db/` — Drizzle schema, migrations, and repositories (all data access goes through `src/db/repositories/*`)
 - `src/services/vesync/` — VeSync scale integration, isolated behind an adapter that never throws (falls back to manual weight entry)
-- `src/services/openFoodFacts/` — barcode/nutrition lookups
+- `src/services/openFoodFacts/` — barcode lookups
+- `src/services/fdc/` — USDA FoodData Central search-by-name
 - `src/services/nutrition/` — weight-based nutrition scaling math
 - `src/services/notifications/` — local reminder scheduling for vitamins/meds
 

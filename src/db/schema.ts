@@ -13,7 +13,7 @@ export const foods = sqliteTable(
     name: text('name').notNull(),
     brand: text('brand'),
     barcode: text('barcode'),
-    source: text('source', { enum: ['manual', 'open_food_facts'] })
+    source: text('source', { enum: ['manual', 'open_food_facts', 'usda_fdc'] })
       .notNull()
       .default('manual'),
     // Nutrition values below are "per servingAmount servingUnit" (e.g. per

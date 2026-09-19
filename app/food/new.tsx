@@ -49,7 +49,9 @@ export default function NewFoodScreen() {
   };
 
   function saveFood(values: ParsedFoodValues): Promise<Food> {
-    return createFood({ ...values, source: params.source === 'open_food_facts' ? 'open_food_facts' : 'manual' });
+    const source =
+      params.source === 'open_food_facts' || params.source === 'usda_fdc' ? params.source : 'manual';
+    return createFood({ ...values, source });
   }
 
   function handleSaveError(error: Error) {

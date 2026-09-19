@@ -4,7 +4,7 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { OffFoodResults } from '../../../src/components/OffFoodResults';
+import { FdcFoodResults } from '../../../src/components/FdcFoodResults';
 import { AppButton } from '../../../src/components/ui/AppButton';
 import { KeyboardAvoidingScreen } from '../../../src/components/ui/KeyboardAvoidingScreen';
 import { SegmentedControl } from '../../../src/components/ui/SegmentedControl';
@@ -18,7 +18,7 @@ import {
   scaleRecipePortion,
 } from '../../../src/services/nutrition/scaling';
 import type { MealType } from '../../../src/services/nutrition/totals';
-import { useOffFoodSearch } from '../../../src/services/openFoodFacts/useOffFoodSearch';
+import { useFdcFoodSearch } from '../../../src/services/fdc/useFdcFoodSearch';
 import { colors, radius, spacing } from '../../../src/theme/theme';
 import { todayLogDateKey } from '../../../src/utils/date';
 import { isWeighableUnit } from '../../../src/utils/servingUnits';
@@ -46,8 +46,8 @@ export default function PickItemScreen() {
     enabled: tab === 'recipes',
   });
 
-  const showOffSearch = tab === 'foods' && query.trim().length > 1;
-  const offSearch = useOffFoodSearch(query, showOffSearch);
+  const showFdcSearch = tab === 'foods' && query.trim().length > 1;
+  const fdcSearch = useFdcFoodSearch(query, showFdcSearch);
 
   const quickAddMutation = useMutation({
     mutationFn: async ({ itemType, id }: QuickAddTarget) => {
@@ -234,16 +234,17 @@ export default function PickItemScreen() {
             )
           }
           ListFooterComponent={
-            showOffSearch ? (
+            showFdcSearch ? (
               <View style={styles.offSection}>
-                <OffFoodResults
-                  results={offSearch.results}
-                  loading={offSearch.loading}
-                  error={offSearch.error}
-                  onRetry={offSearch.retry}
-                  hasMore={offSearch.hasMore}
-                  loadingMore={offSearch.loadingMore}
-                  onLoadMore={offSearch.loadMore}
+                <FdcFoodResults
+                  results={fdcSearch.results}
+                  loading={fdcSearch.loading}
+                  error={fdcSearch.error}
+                  onRetry={fdcSearch.retry}
+                  hasMore={fdcSearch.hasMore}
+                  loadingMore={fdcSearch.loadingMore}
+                  onLoadMore={fdcSearch.loadMore}
+                  needsApiKey={fdcSearch.needsApiKey}
                   context={{ destination: '/food/new', logMealType: mealType, logDate: effectiveLogDate }}
                 />
               </View>
