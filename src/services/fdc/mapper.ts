@@ -20,10 +20,9 @@ const NUTRIENT_NUMBER: Record<string, keyof NutritionFields> = {
 function mapFoodNutrientsPer100g(food: FdcFood): NutritionFields {
   const nutrition: NutritionFields = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0, fiberG: 0, sugarG: 0, sodiumMg: 0 };
   for (const entry of food.foodNutrients ?? []) {
-    const number = entry.nutrient?.number;
-    const field = number ? NUTRIENT_NUMBER[number] : undefined;
-    if (field && entry.amount != null) {
-      nutrition[field] = entry.amount;
+    const field = entry.nutrientNumber ? NUTRIENT_NUMBER[entry.nutrientNumber] : undefined;
+    if (field && entry.value != null) {
+      nutrition[field] = entry.value;
     }
   }
   return nutrition;

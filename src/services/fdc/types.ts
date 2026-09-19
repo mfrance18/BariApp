@@ -13,14 +13,19 @@ export interface FdcLabelNutrients {
   sodium?: FdcLabelNutrientValue;
 }
 
+/**
+ * The shape FDC's /v1/foods/search endpoint actually returns for each
+ * foodNutrients entry — flat, not nested under a "nutrient" object (that
+ * nested shape belongs to the separate /v1/food/{fdcId} detail endpoint,
+ * which this app never calls). Confirmed against a real captured search
+ * response — see mapper.ts's mapFoodNutrientsPer100g.
+ */
 export interface FdcFoodNutrient {
-  nutrient?: {
-    /** The stable USDA nutrient number (e.g. "208" = Energy) — use this to match, not `name`, which varies slightly across dataTypes. */
-    number?: string;
-    name?: string;
-    unitName?: string;
-  };
-  amount?: number;
+  /** The stable USDA nutrient number (e.g. "208" = Energy) — use this to match, not `nutrientName`, which varies slightly across dataTypes. */
+  nutrientNumber?: string;
+  nutrientName?: string;
+  unitName?: string;
+  value?: number;
 }
 
 export interface FdcFood {

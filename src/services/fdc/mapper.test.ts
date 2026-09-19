@@ -57,18 +57,20 @@ describe('mapFdcFoodToFood', () => {
   });
 
   it('maps a generic Foundation/SR Legacy food via the per-100g nutrient-number table', () => {
+    // Real /v1/foods/search shape: flat entries (nutrientNumber/value), not
+    // the nested detail-endpoint shape (nutrient.number/amount).
     const food: FdcFood = {
       fdcId: 3,
       description: 'Chicken, broiler, breast, meat only, raw',
       dataType: 'SR Legacy',
       foodNutrients: [
-        { nutrient: { number: '208', name: 'Energy', unitName: 'kcal' }, amount: 120 },
-        { nutrient: { number: '203', name: 'Protein', unitName: 'g' }, amount: 22.5 },
-        { nutrient: { number: '204', name: 'Total lipid (fat)', unitName: 'g' }, amount: 2.6 },
-        { nutrient: { number: '205', name: 'Carbohydrate, by difference', unitName: 'g' }, amount: 0 },
-        { nutrient: { number: '291', name: 'Fiber, total dietary', unitName: 'g' }, amount: 0 },
-        { nutrient: { number: '269', name: 'Sugars, total including NLEA', unitName: 'g' }, amount: 0 },
-        { nutrient: { number: '307', name: 'Sodium, Na', unitName: 'mg' }, amount: 45 },
+        { nutrientNumber: '208', nutrientName: 'Energy', unitName: 'KCAL', value: 120 },
+        { nutrientNumber: '203', nutrientName: 'Protein', unitName: 'G', value: 22.5 },
+        { nutrientNumber: '204', nutrientName: 'Total lipid (fat)', unitName: 'G', value: 2.6 },
+        { nutrientNumber: '205', nutrientName: 'Carbohydrate, by difference', unitName: 'G', value: 0 },
+        { nutrientNumber: '291', nutrientName: 'Fiber, total dietary', unitName: 'G', value: 0 },
+        { nutrientNumber: '269', nutrientName: 'Sugars, total including NLEA', unitName: 'G', value: 0 },
+        { nutrientNumber: '307', nutrientName: 'Sodium, Na', unitName: 'MG', value: 45 },
       ],
     };
 
@@ -87,8 +89,8 @@ describe('mapFdcFoodToFood', () => {
       description: 'Apple, raw',
       dataType: 'Foundation',
       foodNutrients: [
-        { nutrient: { number: '999', name: 'Some other nutrient', unitName: 'g' }, amount: 500 },
-        { nutrient: { number: '208', name: 'Energy', unitName: 'kcal' }, amount: 52 },
+        { nutrientNumber: '999', nutrientName: 'Some other nutrient', unitName: 'G', value: 500 },
+        { nutrientNumber: '208', nutrientName: 'Energy', unitName: 'KCAL', value: 52 },
       ],
     };
 
