@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   Dimensions,
   FlatList,
   Modal,
@@ -128,6 +129,9 @@ export default function DashboardScreen() {
         await setStatus(item.scheduleId, logDate, 'taken');
         await dismissPresentedNotificationsForSchedule(item.scheduleId);
       }
+      // Re-syncs the system notification for this dose (e.g. cancels a
+      // still-pending reminder for a dose just marked taken before it fired).
+      await rescheduleAll();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['medsChecklist', logDate] }),
   });
@@ -141,6 +145,7 @@ export default function DashboardScreen() {
       queryClient.invalidateQueries({ queryKey: ['medsChecklist', logDate] });
       setRescheduleItem(null);
     },
+    onError: (error: Error) => Alert.alert('Could not reschedule', error.message),
   });
 
   const clearRescheduleMutation = useMutation({

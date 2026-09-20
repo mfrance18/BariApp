@@ -256,9 +256,8 @@ function timeOfDayToMinutes(timeOfDay: string): number {
 }
 
 function minutesToTimeOfDay(totalMinutes: number): string {
-  const clamped = Math.max(0, Math.min(23 * 60 + 59, totalMinutes));
-  const hour = Math.floor(clamped / 60);
-  const minute = clamped % 60;
+  const hour = Math.floor(totalMinutes / 60);
+  const minute = totalMinutes % 60;
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
@@ -321,7 +320,11 @@ export async function rescheduleMedForDate(
     if (siblingLog?.status === 'taken' || siblingLog?.status === 'skipped') continue;
     const siblingEffectiveMinutes = timeOfDayToMinutes(siblingLog?.rescheduledTimeOfDay ?? sibling.timeOfDay);
     if (siblingEffectiveMinutes <= oldEffectiveMinutes) continue;
-    await setRescheduleOverride(sibling.id, scheduledDate, minutesToTimeOfDay(siblingEffectiveMinutes + deltaMinutes));
+    const targetMinutes = siblingEffectiveMinutes + deltaMinutes;
+    if (targetMinutes < 0 || targetMinutes > 23 * 60 + 59) {
+      throw new Error("Can't reschedule — it would push a later dose of this medication past the end of the day.");
+    }
+    await setRescheduleOverride(sibling.id, scheduledDate, minutesToTimeOfDay(targetMinutes));
   }
 }
 
@@ -329,8 +332,22 @@ export async function rescheduleMedForDate(
  * Reverts a rescheduled dose back to its normal scheduled time. If the row
  * has no taken/skipped status either, it's removed entirely rather than
  * left as an empty placeholder.
+ *
+ * Resetting is implemented as rescheduling back to the schedule's own
+ * normal time, reusing rescheduleMedForDate's cascade — so any sibling
+ * doses that were pushed forward by the reschedule being undone shift back
+ * by the same amount, instead of staying stuck at their cascaded time.
  */
 export async function clearRescheduleForDate(scheduleId: number, scheduledDate: string): Promise<void> {
+  const scheduleRows = await db.select().from(medSchedule).where(eq(medSchedule.id, scheduleId));
+  const schedule = scheduleRows[0];
+  if (!schedule) return;
+
+  await rescheduleMedForDate(schedule.vitaminMedId, scheduleId, scheduledDate, schedule.timeOfDay);
+
+  // The call above leaves a redundant override equal to the schedule's own
+  // time; clear it back to null so "no override" stays represented
+  // consistently (see the medLog.rescheduledTimeOfDay schema comment).
   const existing = await db
     .select()
     .from(medLog)
@@ -344,11 +361,20 @@ export async function clearRescheduleForDate(scheduleId: number, scheduledDate: 
   }
 }
 
-/** Every active reschedule override for a given date — used by the notification scheduler (see scheduler.ts). */
+/**
+ * Every active reschedule override for a given date — used by the
+ * notification scheduler (see scheduler.ts). Excludes doses already marked
+ * taken/skipped, so a stale override left over from before that decision
+ * can't cause a phantom notification for a dose that's already handled.
+ */
 export async function listReschedulesForDate(scheduledDate: string): Promise<Map<number, string>> {
   const rows = await db
-    .select({ medScheduleId: medLog.medScheduleId, rescheduledTimeOfDay: medLog.rescheduledTimeOfDay })
+    .select({ medScheduleId: medLog.medScheduleId, rescheduledTimeOfDay: medLog.rescheduledTimeOfDay, status: medLog.status })
     .from(medLog)
     .where(and(eq(medLog.scheduledDate, scheduledDate), isNotNull(medLog.rescheduledTimeOfDay)));
-  return new Map(rows.map((row) => [row.medScheduleId, row.rescheduledTimeOfDay!]));
+  return new Map(
+    rows
+      .filter((row) => row.status !== 'taken' && row.status !== 'skipped')
+      .map((row) => [row.medScheduleId, row.rescheduledTimeOfDay!]),
+  );
 }
