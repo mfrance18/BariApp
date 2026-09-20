@@ -254,10 +254,10 @@ function FluidModal({
   function handleAmountChange(text: string) {
     setAmountInput(text);
     // A personal shorthand: this exact amount is always the same protein
-    // shake, so fill in the name automatically unless it's been typed over.
-    if (!isEdit && !labelTouched && Number(text) === 11.5) {
-      setLabel('Protein Shake');
-    }
+    // shake, so fill in (and clear back out) the name automatically as long
+    // as it hasn't been typed over.
+    if (isEdit || labelTouched) return;
+    setLabel(Number(text) === 11.5 ? 'Protein Shake' : '');
   }
 
   function handleLabelChange(text: string) {
