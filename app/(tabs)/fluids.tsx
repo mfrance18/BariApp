@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
@@ -237,14 +238,32 @@ function FluidModal({
   saving: boolean;
 }) {
   const isEdit = state.mode === 'edit';
+  const insets = useSafeAreaInsets();
   const [amountInput, setAmountInput] = useState(
     isEdit ? formatOz(mlToOz(state.entry.amountMl)) : state.amountOz != null ? formatOz(state.amountOz) : '',
   );
   const [label, setLabel] = useState(isEdit ? (state.entry.sourceLabel ?? '') : '');
+  // Editing an existing entry's saved label counts as "already touched" so
+  // typing a matching amount below never overwrites it.
+  const [labelTouched, setLabelTouched] = useState(isEdit);
   const [loggedAt, setLoggedAt] = useState(
     isEdit ? new Date(state.entry.loggedAt) : combineDateKeyWithNow(logDate),
   );
   const [showPicker, setShowPicker] = useState(Platform.OS === 'ios');
+
+  function handleAmountChange(text: string) {
+    setAmountInput(text);
+    // A personal shorthand: this exact amount is always the same protein
+    // shake, so fill in the name automatically unless it's been typed over.
+    if (!isEdit && !labelTouched && Number(text) === 11.5) {
+      setLabel('Protein Shake');
+    }
+  }
+
+  function handleLabelChange(text: string) {
+    setLabel(text);
+    setLabelTouched(true);
+  }
 
   function handleTimeChange(event: DateTimePickerEvent, date?: Date) {
     if (Platform.OS === 'android') setShowPicker(false);
@@ -268,7 +287,7 @@ function FluidModal({
         style={styles.modalOverlay}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <Card style={styles.modalCard}>
+        <Card style={[styles.modalCard, { paddingBottom: spacing.lg + insets.bottom }]}>
           <Text style={styles.modalTitle}>{isEdit ? 'Edit Fluid' : 'Add Fluid'}</Text>
 
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.modalScrollContent}>
@@ -278,7 +297,7 @@ function FluidModal({
                 style={styles.input}
                 keyboardType="decimal-pad"
                 value={amountInput}
-                onChangeText={setAmountInput}
+                onChangeText={handleAmountChange}
                 selectTextOnFocus
                 autoFocus={!isEdit && state.amountOz == null}
               />
@@ -291,7 +310,7 @@ function FluidModal({
                 placeholder="e.g. Gatorade, Protein shake"
                 placeholderTextColor={colors.textMuted}
                 value={label}
-                onChangeText={setLabel}
+                onChangeText={handleLabelChange}
               />
             </View>
 
