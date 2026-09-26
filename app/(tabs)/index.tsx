@@ -314,17 +314,15 @@ export default function DashboardScreen() {
                   <LineChart
                     data={{ labels: weightChartValues.map(() => ''), datasets: [{ data: weightChartValues }] }}
                     width={CAROUSEL_CARD_WIDTH - spacing.lg * 2}
-                    height={150}
-                    withDots={false}
-                    withInnerLines={false}
-                    withOuterLines={false}
-                    withVerticalLabels={false}
-                    withHorizontalLabels={false}
+                    height={180}
+                    yAxisSuffix={settings?.weightUnit ?? 'lb'}
                     chartConfig={{
                       backgroundColor: colors.card,
                       backgroundGradientFrom: colors.card,
                       backgroundGradientTo: colors.card,
+                      decimalPlaces: 1,
                       color: (opacity = 1) => `rgba(11, 87, 208, ${opacity})`,
+                      labelColor: () => colors.textSecondary,
                     }}
                     bezier
                     style={styles.weightChart}
