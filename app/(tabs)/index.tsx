@@ -17,6 +17,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../../src/components/ui/AppButton';
 import { Card } from '../../src/components/ui/Card';
@@ -82,6 +83,7 @@ function dateToTimeOfDay(date: Date): string {
 export default function DashboardScreen() {
   const { logDate, setLogDate } = useSelectedLogDate();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [rescheduleItem, setRescheduleItem] = useState<TodayChecklistItem | null>(null);
   const [rescheduleTime, setRescheduleTime] = useState(new Date());
@@ -382,7 +384,7 @@ export default function DashboardScreen() {
     {rescheduleItem && (
       <Modal visible transparent animationType="slide" onRequestClose={() => setRescheduleItem(null)}>
         <View style={styles.rescheduleOverlay}>
-          <Card style={styles.rescheduleCard}>
+          <Card style={[styles.rescheduleCard, { paddingBottom: spacing.lg + insets.bottom }]}>
             <Text style={styles.rescheduleTitle}>Reschedule {rescheduleItem.name}</Text>
             <Text style={styles.rescheduleHint}>
               Changes just today's reminder — stays at {formatTimeOfDay(rescheduleItem.originalTimeOfDay)} on other
