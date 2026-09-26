@@ -10,19 +10,24 @@ import {
   type RecipeWithIngredients,
 } from '../../../../src/db/repositories/recipesRepo';
 import { colors } from '../../../../src/theme/theme';
+import { gramsToServing } from '../../../../src/utils/servingUnits';
 
 function recipeToFormValues(recipe: RecipeWithIngredients): RecipeFormValues {
   return {
     name: recipe.name,
     servings: String(recipe.servings),
     notes: recipe.notes ?? '',
-    ingredients: recipe.ingredients.map((ingredient) => ({
-      food: ingredient.food,
-      // Only grams are persisted, so an edited recipe reopens in grams even
-      // if it was originally entered in another unit (e.g. oz).
-      quantityAmount: String(ingredient.quantityG),
-      quantityUnit: 'g',
-    })),
+    // Only grams are persisted, so convert back to oz for display here,
+    // matching RecipeForm's own oz-by-default convention when adding an
+    // ingredient (see requestAddIngredient).
+    ingredients: recipe.ingredients.map((ingredient) => {
+      const oz = gramsToServing(ingredient.quantityG, 'oz') ?? ingredient.quantityG;
+      return {
+        food: ingredient.food,
+        quantityAmount: String(Math.round(oz * 100) / 100),
+        quantityUnit: 'oz',
+      };
+    }),
   };
 }
 
