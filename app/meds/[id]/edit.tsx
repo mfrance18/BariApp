@@ -271,7 +271,7 @@ export default function EditVitaminMedScreen() {
     <>
     <KeyboardAwareScrollView
       style={styles.container}
-      contentContainerStyle={StyleSheet.flatten(styles.content)}
+      contentContainerStyle={StyleSheet.flatten([styles.content, { paddingBottom: 48 + insets.bottom }])}
       keyboardShouldPersistTaps="handled"
       enableOnAndroid
       extraScrollHeight={120}
@@ -372,7 +372,7 @@ export default function EditVitaminMedScreen() {
     {Platform.OS === 'ios' && (
       <Modal visible={pickerIndex != null} transparent animationType="slide" onRequestClose={() => setPickerIndex(null)}>
         <View style={styles.pickerModalOverlay}>
-          <Card style={styles.pickerModalCard}>
+          <Card style={[styles.pickerModalCard, { paddingBottom: spacing.lg + insets.bottom }]}>
             {pickerIndex != null && (
               <DateTimePicker
                 value={scheduleToDate(schedules[pickerIndex])}
