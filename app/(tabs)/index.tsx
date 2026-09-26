@@ -17,6 +17,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AppButton } from '../../src/components/ui/AppButton';
@@ -34,7 +35,7 @@ import {
   type TodayChecklistItem,
 } from '../../src/db/repositories/medsRepo';
 import { getSettings } from '../../src/db/repositories/settingsRepo';
-import { getLatestWeightLogEntry } from '../../src/db/repositories/weightRepo';
+import { getLatestWeightLogEntry, listWeightLog } from '../../src/db/repositories/weightRepo';
 import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
 import { getDailyActivity, hasHealthConnectAccess } from '../../src/services/healthConnect/adapter';
 import { dismissPresentedNotificationsForSchedule, rescheduleAll } from '../../src/services/notifications/scheduler';
@@ -50,6 +51,7 @@ function formatWeightOz(weightG: number): string {
 }
 
 const KG_TO_LB = 2.20462;
+const WEIGHT_CHART_DAYS = 30;
 
 // The app is portrait-locked, so a static width computed once is fine.
 const CAROUSEL_CARD_WIDTH = Dimensions.get('window').width - spacing.lg * 2;
@@ -106,6 +108,10 @@ export default function DashboardScreen() {
 
   const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
   const { data: latestWeight } = useQuery({ queryKey: ['weightLog', 'latest'], queryFn: getLatestWeightLogEntry });
+  const { data: recentWeights } = useQuery({
+    queryKey: ['weightLog', 'recent'],
+    queryFn: () => listWeightLog(new Date(Date.now() - WEIGHT_CHART_DAYS * 24 * 60 * 60 * 1000)),
+  });
   const { data: fluidEntries } = useQuery({
     queryKey: ['fluidLog', logDate],
     queryFn: () => listFluidEntriesForDate(logDate),
@@ -172,6 +178,11 @@ export default function DashboardScreen() {
     if (event.type === 'dismissed' || !date) return;
     setRescheduleTime(date);
   }
+
+  const toDisplayWeightUnit = (weightKg: number) => (settings?.weightUnit === 'kg' ? weightKg : weightKg * KG_TO_LB);
+  // listWeightLog returns newest-first; a trend chart reads left-to-right
+  // oldest-to-newest, so reverse it.
+  const weightChartValues = (recentWeights ?? []).slice().reverse().map((entry) => toDisplayWeightUnit(entry.weightKg));
 
   const grouped = groupEntriesByMeal(entries ?? []);
   const fluidTotalMl = (fluidEntries ?? []).reduce((sum, e) => sum + e.amountMl, 0);
@@ -279,35 +290,50 @@ export default function DashboardScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.carouselPage} onPress={() => router.push('/weight-history')} activeOpacity={0.8}>
-              <Card style={[styles.carouselCard, styles.weightCard]}>
-                <View style={styles.weightIconCircle}>
-                  <Ionicons name="trending-down" size={28} color={colors.weight} />
+              <Card style={styles.carouselCard}>
+                <View style={styles.weightHeaderRow}>
+                  <View style={styles.weightIconCircle}>
+                    <Ionicons name="trending-down" size={20} color={colors.weight} />
+                  </View>
+                  {latestWeight ? (
+                    <View>
+                      <Text style={styles.weightHeaderValue}>
+                        {toDisplayWeightUnit(latestWeight.weightKg).toFixed(1)}{' '}
+                        <Text style={styles.statCardUnit}>{settings?.weightUnit ?? 'lb'}</Text>
+                      </Text>
+                      <Text style={styles.statCardLabel}>
+                        {new Date(latestWeight.recordedAt).toLocaleDateString()}
+                      </Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.statCardLabel}>Tap to log your weight</Text>
+                  )}
                 </View>
-                {latestWeight ? (
-                  <>
-                    <Text style={styles.ringValue}>
-                      {(settings?.weightUnit === 'kg' ? latestWeight.weightKg : latestWeight.weightKg * KG_TO_LB).toFixed(
-                        1,
-                      )}{' '}
-                      <Text style={styles.statCardUnit}>{settings?.weightUnit ?? 'lb'}</Text>
-                    </Text>
-                    <Text style={styles.statCardLabel}>
-                      {new Date(latestWeight.recordedAt).toLocaleDateString()}
-                    </Text>
-                  </>
-                ) : (
-                  <Text style={styles.statCardLabel}>Tap to log your weight</Text>
+
+                {weightChartValues.length > 1 && (
+                  <LineChart
+                    data={{ labels: weightChartValues.map(() => ''), datasets: [{ data: weightChartValues }] }}
+                    width={CAROUSEL_CARD_WIDTH - spacing.lg * 2}
+                    height={150}
+                    withDots={false}
+                    withInnerLines={false}
+                    withOuterLines={false}
+                    withVerticalLabels={false}
+                    withHorizontalLabels={false}
+                    chartConfig={{
+                      backgroundColor: colors.card,
+                      backgroundGradientFrom: colors.card,
+                      backgroundGradientTo: colors.card,
+                      color: (opacity = 1) => `rgba(11, 87, 208, ${opacity})`,
+                    }}
+                    bezier
+                    style={styles.weightChart}
+                  />
                 )}
 
-                {healthAccess && activity && (activity.steps != null || activity.caloriesBurned != null) && (
+                {healthAccess && activity?.steps != null && (
                   <View style={styles.statChipsRow}>
-                    {activity.steps != null && <StatChip label="Steps" value={activity.steps} />}
-                    {activity.caloriesBurned != null && (
-                      <StatChip
-                        label={activity.caloriesSource === 'total' ? 'Cal Burned (total)' : 'Cal Burned'}
-                        value={Math.round(activity.caloriesBurned)}
-                      />
-                    )}
+                    <StatChip label="Steps" value={activity.steps} />
                   </View>
                 )}
               </Card>
@@ -693,19 +719,28 @@ const styles = StyleSheet.create({
   fluidCard: {
     alignItems: 'center',
   },
-  weightCard: {
+  weightHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  weightHeaderValue: {
+    ...typography.title,
+    fontSize: 20,
   },
   weightIconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.background,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
-    marginBottom: spacing.sm,
+  },
+  weightChart: {
+    marginTop: spacing.sm,
+    borderRadius: radius.md,
   },
   statChipsRow: {
     flexDirection: 'row',
