@@ -41,7 +41,7 @@ import { getDailyActivity, hasHealthConnectAccess } from '../../src/services/hea
 import { dismissPresentedNotificationsForSchedule, rescheduleAll } from '../../src/services/notifications/scheduler';
 import { groupEntriesByMeal, MEAL_TYPES, sumEntries, type MealType } from '../../src/services/nutrition/totals';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { addLogDays, formatDisplayDate, formatTimeOfDay, todayLogDateKey } from '../../src/utils/date';
+import { addLogDays, formatDisplayDate, formatTimeOfDay, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz } from '../../src/utils/units';
 import { gramsToServing } from '../../src/utils/servingUnits';
 
@@ -90,10 +90,17 @@ export default function DashboardScreen() {
   const [rescheduleItem, setRescheduleItem] = useState<TodayChecklistItem | null>(null);
   const [rescheduleTime, setRescheduleTime] = useState(new Date());
   const [showReschedulePicker, setShowReschedulePicker] = useState(Platform.OS === 'ios');
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   function handleCarouselMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const index = Math.round(event.nativeEvent.contentOffset.x / CAROUSEL_CARD_WIDTH);
     setActiveCardIndex(Math.max(0, Math.min(DASHBOARD_CARD_COUNT - 1, index)));
+  }
+
+  function handleDatePickerChange(event: DateTimePickerEvent, date?: Date) {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'dismissed' || !date) return;
+    setLogDate(toLogDateKey(date));
   }
 
   const { data: entries } = useQuery({
@@ -210,14 +217,16 @@ export default function DashboardScreen() {
             <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, -1))} hitSlop={12}>
               <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
-            {logDate === todayLogDateKey() ? (
-              <View style={styles.dateHeadingColumn}>
-                <Text style={styles.dateHeading}>Today</Text>
-                <Text style={styles.dateSubheading}>{formatDisplayDate(logDate)}</Text>
-              </View>
-            ) : (
-              <Text style={styles.dateHeading}>{formatDisplayDate(logDate)}</Text>
-            )}
+            <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+              {logDate === todayLogDateKey() ? (
+                <View style={styles.dateHeadingColumn}>
+                  <Text style={styles.dateHeading}>Today</Text>
+                  <Text style={styles.dateSubheading}>{formatDisplayDate(logDate)}</Text>
+                </View>
+              ) : (
+                <Text style={styles.dateHeading}>{formatDisplayDate(logDate)}</Text>
+              )}
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, 1))} hitSlop={12}>
               <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -443,6 +452,29 @@ export default function DashboardScreen() {
               />
             )}
             <AppButton title="Cancel" variant="secondary" onPress={() => setRescheduleItem(null)} />
+          </Card>
+        </View>
+      </Modal>
+    )}
+    {Platform.OS === 'android' && showDatePicker && (
+      <DateTimePicker
+        value={new Date(`${logDate}T00:00:00`)}
+        mode="date"
+        display="calendar"
+        onChange={handleDatePickerChange}
+      />
+    )}
+    {Platform.OS === 'ios' && (
+      <Modal visible={showDatePicker} transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+        <View style={styles.datePickerOverlay}>
+          <Card style={[styles.datePickerCard, { paddingBottom: spacing.lg + insets.bottom }]}>
+            <DateTimePicker
+              value={new Date(`${logDate}T00:00:00`)}
+              mode="date"
+              display="inline"
+              onChange={handleDatePickerChange}
+            />
+            <AppButton title="Done" onPress={() => setShowDatePicker(false)} />
           </Card>
         </View>
       </Modal>
@@ -860,6 +892,17 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     gap: spacing.md,
+  },
+  datePickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  datePickerCard: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    gap: spacing.md,
+    alignItems: 'center',
   },
   rescheduleTitle: {
     ...typography.heading,

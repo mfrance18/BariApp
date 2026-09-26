@@ -31,7 +31,7 @@ import {
 import { getSettings } from '../../src/db/repositories/settingsRepo';
 import { useSelectedLogDate } from '../../src/hooks/useSelectedLogDate';
 import { colors, radius, spacing, typography } from '../../src/theme/theme';
-import { addLogDays, formatDisplayDate, todayLogDateKey } from '../../src/utils/date';
+import { addLogDays, formatDisplayDate, toLogDateKey, todayLogDateKey } from '../../src/utils/date';
 import { mlToOz, ozToMl } from '../../src/utils/units';
 
 /** Combines a "YYYY-MM-DD" log date with the current wall-clock time — used
@@ -62,7 +62,15 @@ type FluidModalState = { mode: 'add'; amountOz: number | null } | { mode: 'edit'
 export default function FluidsScreen() {
   const queryClient = useQueryClient();
   const { logDate, setLogDate } = useSelectedLogDate();
+  const insets = useSafeAreaInsets();
   const [modalState, setModalState] = useState<FluidModalState | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  function handleDatePickerChange(event: DateTimePickerEvent, date?: Date) {
+    if (Platform.OS === 'android') setShowDatePicker(false);
+    if (event.type === 'dismissed' || !date) return;
+    setLogDate(toLogDateKey(date));
+  }
 
   const { data: settings } = useQuery({ queryKey: ['app_settings'], queryFn: getSettings });
   const { data: entries } = useQuery({
@@ -116,14 +124,16 @@ export default function FluidsScreen() {
             <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, -1))} hitSlop={12}>
               <Ionicons name="chevron-back" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
-            {logDate === todayLogDateKey() ? (
-              <View style={styles.dateHeadingColumn}>
-                <Text style={styles.heading}>Today</Text>
-                <Text style={styles.dateSubheading}>{formatDisplayDate(logDate)}</Text>
-              </View>
-            ) : (
-              <Text style={styles.heading}>{formatDisplayDate(logDate)}</Text>
-            )}
+            <TouchableOpacity onPress={() => setShowDatePicker(true)}>
+              {logDate === todayLogDateKey() ? (
+                <View style={styles.dateHeadingColumn}>
+                  <Text style={styles.heading}>Today</Text>
+                  <Text style={styles.dateSubheading}>{formatDisplayDate(logDate)}</Text>
+                </View>
+              ) : (
+                <Text style={styles.heading}>{formatDisplayDate(logDate)}</Text>
+              )}
+            </TouchableOpacity>
             <TouchableOpacity onPress={() => setLogDate((d) => addLogDays(d, 1))} hitSlop={12}>
               <Ionicons name="chevron-forward" size={22} color={colors.textSecondary} />
             </TouchableOpacity>
@@ -189,6 +199,29 @@ export default function FluidsScreen() {
         onDelete={(id) => deleteMutation.mutate(id)}
         saving={addMutation.isPending || updateMutation.isPending}
       />
+    )}
+    {Platform.OS === 'android' && showDatePicker && (
+      <DateTimePicker
+        value={new Date(`${logDate}T00:00:00`)}
+        mode="date"
+        display="calendar"
+        onChange={handleDatePickerChange}
+      />
+    )}
+    {Platform.OS === 'ios' && (
+      <Modal visible={showDatePicker} transparent animationType="slide" onRequestClose={() => setShowDatePicker(false)}>
+        <View style={styles.datePickerOverlay}>
+          <Card style={[styles.datePickerCard, { paddingBottom: spacing.lg + insets.bottom }]}>
+            <DateTimePicker
+              value={new Date(`${logDate}T00:00:00`)}
+              mode="date"
+              display="inline"
+              onChange={handleDatePickerChange}
+            />
+            <AppButton title="Done" onPress={() => setShowDatePicker(false)} />
+          </Card>
+        </View>
+      </Modal>
     )}
     </KeyboardAvoidingScreen>
   );
@@ -468,6 +501,17 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 0,
     gap: spacing.md,
     maxHeight: '90%',
+  },
+  datePickerOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  datePickerCard: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    gap: spacing.md,
+    alignItems: 'center',
   },
   modalScrollContent: {
     gap: spacing.md,
